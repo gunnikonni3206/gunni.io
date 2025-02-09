@@ -1,75 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Room</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-        }
-        #chat-box {
-            width: 80%;
-            margin: auto;
-            max-width: 600px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background: #f9f9f9;
-        }
-        input, button {
-            padding: 10px;
-            margin: 5px;
-            width: 80%;
-            max-width: 300px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Retro Chat Room</title>
+  <style>
+    /* Base Retro Style */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Courier New", Courier, monospace;
+      background: #111;
+      color: #eee;
+    }
+    header {
+      background: #222;
+      padding: 10px 20px;
+      border-bottom: 3px solid #0f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2em;
+      color: #0f0;
+    }
+    nav {
+      display: flex;
+      gap: 10px;
+    }
+    nav button {
+      padding: 8px 12px;
+      background: #0f0;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #111;
+      transition: background 0.2s;
+    }
+    nav button:hover {
+      background: #0c0;
+    }
+    .container {
+      display: flex;
+      min-height: calc(100vh - 60px); /* Adjust for header height */
+    }
+    .sidebar {
+      width: 200px;
+      background: #222;
+      padding: 15px;
+      border-right: 3px solid #0f0;
+    }
+    .sidebar h3 {
+      margin-top: 0;
+      color: #0f0;
+    }
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+    }
+    .sidebar ul li {
+      margin: 10px 0;
+    }
+    .sidebar ul li a {
+      color: #0f0;
+      text-decoration: none;
+    }
+    .sidebar ul li a:hover {
+      text-decoration: underline;
+    }
+    .main {
+      flex: 1;
+      padding: 20px;
+    }
+    .chat-container {
+      background: #1a1a1a;
+      border: 2px solid #0f0;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 0 10px #0f0;
+      margin: 20px auto;
+      max-width: 800px;
+    }
+    .chat-container h2 {
+      margin-top: 0;
+      color: #0f0;
+      text-align: center;
+    }
+    /* Utterances container spacing */
+    .utterances-container {
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>Retro Chat Room</h1>
+    <nav>
+      <button onclick="location.href='index.html'">Home</button>
+      <button onclick="location.href='subpages/about.html'">About</button>
+      <button onclick="location.href='subpages/games.html'">Games</button>
+      <button onclick="location.href='subpages/contact.html'">Contact</button>
+      <button onclick="location.href='subpages/chat.html'">Chat</button>
+    </nav>
+  </header>
 
-    <h1>Live Chat</h1>
-    <div id="chat-box">
-        <p>Type a message and hit send!</p>
-        <input type="text" id="username" placeholder="Enter your username" required><br>
-        <input type="text" id="message" placeholder="Enter your message" required><br>
-        <button onclick="postMessage()">Send</button>
+  <div class="container">
+    <div class="sidebar">
+      <h3>Navigation</h3>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="subpages/about.html">About</a></li>
+        <li><a href="subpages/games.html">Games</a></li>
+        <li><a href="subpages/contact.html">Contact</a></li>
+        <li><a href="subpages/chat.html">Chat</a></li>
+      </ul>
     </div>
 
-    <!-- Utterances Comments -->
-    <div class="utterances-container">
-        <script src="https://utteranc.es/client.js"
-                repo="gunnikonni3206/gunni.io"
-                issue-term="pathname"
-                label="chat"
-                theme="github-light"
-                crossorigin="anonymous"
-                async>
-        </script>
+    <div class="main">
+      <div class="chat-container">
+        <h2>Join the Conversation</h2>
+        <!-- Utterances Comments Integration -->
+        <div class="utterances-container">
+          <script src="https://utteranc.es/client.js"
+                  repo="gunnikonni3206/gunni.io"
+                  issue-term="pathname"
+                  label="chat"
+                  theme="github-dark"
+                  crossorigin="anonymous"
+                  async>
+          </script>
+        </div>
+      </div>
     </div>
-
-    <script>
-        function postMessage() {
-            const username = document.getElementById('username').value.trim();
-            const message = document.getElementById('message').value.trim();
-            
-            if (!username || !message) {
-                alert("Please enter both a username and a message.");
-                return;
-            }
-
-            // Generate the message format
-            const formattedMessage = `**${username}:** ${message}`;
-            
-            // Auto-fill the comment box with the message
-            const utterancesTextarea = document.querySelector('.utterances-container iframe');
-            if (utterancesTextarea) {
-                utterancesTextarea.contentWindow.document.querySelector('textarea').value = formattedMessage;
-            }
-
-            alert("Message added! Scroll to see it in the chat.");
-        }
-    </script>
-
+  </div>
 </body>
 </html>
