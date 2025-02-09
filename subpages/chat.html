@@ -1,38 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Chat</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #chat-box {
+            width: 80%;
+            margin: auto;
+            max-width: 600px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            width: 80%;
+            max-width: 300px;
+        }
+    </style>
 </head>
 <body>
-  <h1>Chat</h1>
-  <form id="chatForm">
-    <input type="text" id="message" placeholder="Type your message" required>
-    <button type="submit">Send</button>
-  </form>
-  <p id="response"></p>
 
-  <script>
-    const form = document.getElementById('chatForm');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const message = document.getElementById('message').value;
-      const responseElem = document.getElementById('response');
+    <h1>Live Chat</h1>
+    <div id="chat-box">
+        <p>Type a message and hit send!</p>
+        <input type="text" id="username" placeholder="Enter your username" required><br>
+        <input type="text" id="message" placeholder="Enter your message" required><br>
+        <button onclick="postMessage()">Send</button>
+    </div>
 
-      try {
-        const res = await fetch('http://localhost:3000/append', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ message })
-        });
-        const text = await res.text();
-        responseElem.textContent = text;
-      } catch (error) {
-        responseElem.textContent = 'Error sending message';
-      }
-    });
-  </script>
+    <!-- Utterances Comments -->
+    <div class="utterances-container">
+        <script src="https://utteranc.es/client.js"
+                repo="gunnikonni3206/gunni.io"
+                issue-term="pathname"
+                label="chat"
+                theme="github-light"
+                crossorigin="anonymous"
+                async>
+        </script>
+    </div>
+
+    <script>
+        function postMessage() {
+            const username = document.getElementById('username').value.trim();
+            const message = document.getElementById('message').value.trim();
+            
+            if (!username || !message) {
+                alert("Please enter both a username and a message.");
+                return;
+            }
+
+            // Generate the message format
+            const formattedMessage = `**${username}:** ${message}`;
+            
+            // Auto-fill the comment box with the message
+            const utterancesTextarea = document.querySelector('.utterances-container iframe');
+            if (utterancesTextarea) {
+                utterancesTextarea.contentWindow.document.querySelector('textarea').value = formattedMessage;
+            }
+
+            alert("Message added! Scroll to see it in the chat.");
+        }
+    </script>
+
 </body>
 </html>
