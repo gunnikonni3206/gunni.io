@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Maze Explorer</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Maze parameters
+        const pathWidth = 10;
+        const wallWidth = 2;
+        const outerWall = 2;
+        const width = 25;
+        const height = 25;
+        const delay = 1;
+        let x = Math.floor(width / 2);
+        let y = Math.floor(height / 2);
+        const seed = Math.random() * 100000 | 0;
+
+        const wallColor = '#d24';
+        const pathColor = '#222a33';
+
+        let map = [];
+        const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        const offsets = pathWidth / 2 + outerWall;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Function to generate random numbers
+        function randomGen(seed) {
+            return function () {
+                seed = (seed * 9301 + 49297) % 233280;
+                return seed / 233280;
+            }
+        }
+
+        const random = randomGen(seed);
+
+        function initMaze() {
+            for (let i = 0; i < height * 2; i++) {
+                map[i] = [];
+                for (let j = 0; j < width * 2; j++) {
+                    map[i][j] = false;
+                }
+            }
+            map[y * 2][x * 2] = true;
+            generateMaze();
+        }
+
+        function generateMaze() {
+            const route = [[x, y]];
+
+            const loop = () => {
+                x = route[route.length - 1][0];
+                y = route[route.length - 1][1];
+                let alternatives = [];
+
+                for (let i = 0; i < directions.length; i++) {
+                    const newX = directions[i][0] + x;
+                    const newY = directions[i][1] + y;
+                    if (map[newY * 2] !== undefined && !map[newY * 2][newX * 2]) {
+                        alternatives.push(directions[i]);
+                    }
+                }
+
+                if (alternatives.length === 0) {
+                    route.pop();
+                    if (route.length > 0) {
+                        return loop();
+                    }
+                    return;
+                }
+
+                const direction = alternatives[random() * alternatives.length | 0];
+                route.push([direction[0] + x, direction[1] + y]);
+                map[direction[1] + y * 2][direction[0] + x * 2] = true;
+                map[direction[1] + y * 2][direction[0] + x * 2] = true;
+                setTimeout(loop, delay);
+            }
+
+            loop();
+        }
+
+        function drawMaze() {
+            const wallMaterial = new THREE.MeshStandardMaterial({ color: wallColor });
+            const pathMaterial = new THREE.MeshStandardMaterial({ color: pathColor });
+
+            // Create walls and paths
+            for (let i = 0; i < height * 2; i++) {
+                for (let j = 0; j < width * 2; j++) {
+                    if (map[i][j]) {
+                        const pathGeometry = new THREE.BoxGeometry(pathWidth, 1, pathWidth);
+                        const pathMesh = new THREE.Mesh(pathGeometry, pathMaterial);
+                        pathMesh.position.set(j * (pathWidth + wallWidth) - (width * (pathWidth + wallWidth)) / 2 + offsets,
+                                              0,
+                                              i * (pathWidth + wallWidth) - (height * (pathWidth + wallWidth)) / 2 + offsets);
+                        scene.add(pathMesh);
+                    } else {
+                        const wallGeometry = new THREE.BoxGeometry(wallWidth, 2, wallWidth);
+                        const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+                        wallMesh.position.set(j * (pathWidth + wallWidth) - (width * (pathWidth + wallWidth)) / 2 + offsets,
+                                              1,
+                                              i * (pathWidth + wallWidth) - (height * (pathWidth + wallWidth)) / 2 + offsets);
+                        scene.add(wallMesh);
+                    }
+                }
+            }
+        }
+
+        // Player setup
+        const playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+        const playerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const player = new THREE.Mesh(playerGeometry, playerMaterial);
+        player.position.y = 0.5; // Position above ground
+        scene.add(player);
+
+        // Set camera position
+        camera.position.set(0, 2, 10);
+        camera.lookAt(0, 0, 0);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(5, 10, 7.5).normalize();
+        scene.add(directionalLight);
+
+        // Movement controls
+        let keys = {};
+        document.addEventListener('keydown', (event) => {
+            keys[event.key] = true;
+        });
+
+        document.addEventListener('keyup', (event) => {
+            keys[event.key] = false;
+        });
+
+        function updatePlayer() {
+            const forward = new THREE.Vector3();
+            camera.getWorldDirection(forward);
+            forward.y = 0; // Ignore vertical direction
+            forward.normalize();
+
+            const right = new THREE.Vector3();
+            right.crossVectors(forward, new THREE.Vector3(0, 1, 0)); // Right direction
+
+            if (keys['w']) player.position.add(forward.clone().multiplyScalar(0.1)); // Move forward
+            if (keys['s']) player.position.add(forward.clone().multiplyScalar(-0.1)); // Move backward
+            if (keys['a']) player.position.add(right.clone().multiplyScalar(-0.1)); // Move left
+            if (keys['d']) player.position.add(right.clone().multiplyScalar(0.1)); // Move right
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePlayer();
+            renderer.render(scene, camera);
+        }
+
+        initMaze();
+        drawMaze();
+        animate();
+
+        // Resize handling
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

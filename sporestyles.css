@@ -1,0 +1,107 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #000428, #004e92); /* Gradient background */
+    color: #fff; /* Text color */
+}
+
+header {
+    background: linear-gradient(90deg, #002040, #004080); /* Gradient for header */
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); /* Shadow for depth */
+}
+
+nav ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+nav ul li {
+    display: inline;
+    margin-right: 20px;
+}
+
+nav ul li a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    text-shadow: 0 0 5px #ffcc00; /* Glow effect on text */
+}
+
+.hero {
+    background: radial-gradient(circle, rgba(0,36,61,1) 0%, rgba(2,68,115,1) 100%), url('hero-background.jpg');
+    background-size: cover;
+    color: white;
+    text-align: center;
+    padding: 50px 0;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3); /* Glow around the section */
+}
+
+.hero h1 {
+    font-size: 3em;
+    text-shadow: 0 0 10px #ffcc00, 0 0 20px #ffcc00; /* Glowing text */
+}
+
+.cta-buttons a {
+    display: inline-block;
+    margin: 10px;
+    padding: 15px 30px;
+    background: linear-gradient(45deg, #ffcc00, #ff8800);
+    color: #000;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(255, 136, 0, 0.8); /* Glowing button */
+    transition: transform 0.3s ease;
+}
+
+.cta-buttons a:hover {
+    transform: scale(1.1); /* Button enlarges on hover */
+}
+
+.player-creations {
+    text-align: center;
+    padding: 40px 0;
+    background: linear-gradient(135deg, #003366, #005599); /* Gradient for this section */
+    box-shadow: 0 0 15px rgba(0, 136, 255, 0.6); /* Glow for the section */
+}
+
+.creations-list {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+}
+
+.creation-item {
+    background-color: #001a33;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 136, 255, 0.8); /* Glowing effect on creations */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.creation-item:hover {
+    transform: scale(1.05); /* Slight grow on hover */
+    box-shadow: 0 0 30px rgba(0, 136, 255, 1); /* Stronger glow on hover */
+}
+
+.creation-item img {
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); /* Glow effect around images */
+}
+
+footer {
+    background: linear-gradient(90deg, #001a33, #00294d); /* Footer gradient */
+    color: white;
+    text-align: center;
+    padding: 20px;
+    margin-top: 40px;
+    box-shadow: 0 0 10px rgba(0, 136, 255, 0.6); /* Footer glow */
+}
+
+footer p {
+    text-shadow: 0 0 5px #ffcc00; /* Glow effect on footer text */
+}

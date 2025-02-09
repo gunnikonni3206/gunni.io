@@ -1,0 +1,221 @@
+body {
+    background-image: url(https://onlinegiftools.com/images/examples-onlinegiftools/surface-3d-projection.gif);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-size: cover;
+    height: 100vh;
+    margin: 0;
+    color: #000; /* Change text color to black */
+    display: flex;
+    flex-direction: column;
+    background-color: rgba(0, 0, 0, 0.7); /* Dark overlay on background */
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: rgba(255, 255, 204, 0.8); /* Semi-transparent header */
+    padding: 10px;
+    border-bottom: 3px solid #663300; /* Border at the bottom of header */
+  }
+
+  nav {
+    display: flex;
+    gap: 10px; /* Space between buttons */
+  }
+
+  nav button {
+    padding: 10px 15px;
+    background-color: #663300; /* Dark brown */
+    color: #000; /* Change button text color to black */
+    border: none;
+    cursor: pointer;
+    border-radius: 5px; /* Rounded corners */
+  }
+
+  nav button:hover {
+    background-color: #993300; /* Lighter brown on hover */
+  }
+
+  h1 {
+    font-size: 3em;
+    text-align: center;
+    color: #000; /* Change heading text color to black */
+    text-shadow: none; /* Remove text shadow for better visibility */
+    background-color: rgba(255, 255, 204, 0.9); /* Semi-transparent pale yellow */
+    padding: 10px;
+    border: 3px outset #663300; /* Outset border */
+    margin: 0; /* Remove default margin */
+  }
+
+  .content {
+    display: flex; /* Flexbox for sidebar and main content */
+    flex: 1; /* Allow content to grow */
+  }
+
+  .sidebar {
+    background-color: rgba(255, 255, 204, 0.8); /* Sidebar background */
+    padding: 15px;
+    border-right: 3px solid #663300; /* Right border for sidebar */
+    width: 200px; /* Fixed width for sidebar */
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.3); /* Shadow for depth */
+  }
+
+  .main {
+    flex: 1; /* Main content takes the rest of the space */
+    padding: 20px;
+  }
+
+  p {
+    font-size: 1.2em;
+    line-height: 1.5;
+    color: #000; /* Change paragraph text color to black */
+  }
+
+  a {
+    color: #000; /* Change link color to black */
+    text-decoration: underline;
+  }
+
+  a:hover {
+    color: #990000; /* Dark red on hover */
+  }
+
+  .blinking {
+    animation: blink 1s infinite; 
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  marquee {
+    background-color: #FFCC99; /* Peachy background */
+    padding: 10px;
+    font-weight: bold;
+    color: #000; /* Change marquee text color to black */
+  }
+
+  table {
+    width: 100%;
+    margin: 20px 0;
+    border-collapse: collapse; 
+  }
+
+  td, th {
+    border: 1px solid #663300;
+    padding: 10px;
+    text-align: center;
+    color: #000; /* Change table text color to black */
+  }
+
+  .guestbook {
+    margin-top: 20px;
+  }
+
+  .guestbook form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .guestbook input, .guestbook textarea {
+    margin-bottom: 10px;
+    padding: 5px;
+    border: 1px solid #663300;
+  }
+
+  .construction {
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  .midi-player {
+    background-color: rgba(255, 255, 204, 0.9);
+    padding: 15px;
+    border: 3px inset #663300; /* Inset border */
+    margin-top: 20px;
+    text-align: center;
+    font-size: 1.5em; /* Increased font size */
+    color: #000; /* Change text color to black */
+  }
+
+  .hit-counter {
+    text-align: center;
+    font-size: 1.5em;
+    margin-top: 20px;
+    color: #000; /* Change text color to black */
+  }
+
+  .gif-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    margin-top: 20px;
+  }
+
+  .gif-section {
+    margin-top: 40px;
+    text-align: center;
+    background-color: rgba(255, 255, 204, 0.8); /* Semi-transparent */
+    border: 3px solid #663300; /* Border around sections */
+    padding: 10px;
+  }
+
+  .gif {
+    width: 200px;
+    height: 200px;
+    margin: 10px;
+  }
+
+  .omnimon-core {
+    margin-top: 40px;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 20px;
+    padding: 10px;
+    background-color: rgba(255, 255, 204, 0.9); /* Semi-transparent footer */
+    border-top: 2px solid #663300;
+    font-size: 1.2em; /* Increased font size */
+    color: #000; /* Change footer text color to black */
+  }
+
+  .ad {
+    display: none; /* Hidden by default */
+    position: fixed; /* Fixed position */
+    bottom: 20px; /* Distance from the bottom */
+    right: 20px; /* Distance from the right */
+    background-color: rgba(255, 255, 204, 0.9); /* Background for ad */
+    border: 2px solid #663300; /* Border around ad */
+    padding: 10px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5); /* Shadow for depth */
+    z-index: 1000; /* Ensure it's on top */
+    text-align: center; /* Center text in ad */
+  }
+
+  .ad img {
+    width: 100px; /* Width of the ad GIF */
+    height: auto; /* Maintain aspect ratio */
+  }
+
+  .ad a {
+    color: #000; /* Change ad link color to black */
+    text-decoration: none; /* No underline for the link */
+  }
+
+  /* New styles for the GIF section in the middle */
+  .gif-replace {
+    background-color: rgba(0, 0, 0, 0.8); /* Darker background for the GIF area */
+    border: 3px solid #663300; /* Border around the GIF area */
+    padding: 10px;
+    text-align: center; /* Center the GIF */
+    margin-top: 20px; /* Space above the GIF */
+  }
+
+  .gif-replace img {
+    width: 300px; /* Set the width of the GIF */
+    height: auto; /* Maintain aspect ratio */
+  }

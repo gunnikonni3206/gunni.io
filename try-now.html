@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Optimized 3D Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #settings {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
+      display: none;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #fpsCounter {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      color: white;
+      font-size: 18px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 5px;
+      border-radius: 5px;
+      z-index: 10;
+    }
+    #settingsButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      cursor: pointer;
+    }
+    #settingsInfo {
+      position: absolute;
+      top: 50px;
+      left: 250px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
+      display: none;
+    }
+    label {
+      display: inline-block;
+      width: 150px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Settings Button -->
+  <img id="settingsButton" src="https://avatars.githubusercontent.com/u/60727715?s=200&v=4" width="50" height="50" alt="Settings Button">
+  
+  <!-- Settings Menu -->
+  <div id="settings">
+    <h3>Settings</h3>
+    <label for="sensitivity">Mouse Sensitivity:</label>
+    <input type="range" id="sensitivity" min="0.001" max="0.01" step="0.001" value="0.002"><br><br>
+    
+    <label for="speed">Movement Speed:</label>
+    <input type="range" id="speed" min="0.05" max="0.3" step="0.01" value="0.1"><br><br>
+    
+    <label for="jumpStrength">Jump Strength:</label>
+    <input type="range" id="jumpStrength" min="0.1" max="1" step="0.1" value="0.3"><br><br>
+    
+    <label for="fov">Field of View:</label>
+    <input type="range" id="fov" min="30" max="100" step="1" value="75"><br><br>
+
+    <label for="fogNear">Fog Near Distance:</label>
+    <input type="range" id="fogNear" min="1" max="50" step="1" value="10"><br><br>
+
+    <label for="fogFar">Fog Far Distance:</label>
+    <input type="range" id="fogFar" min="50" max="200" step="1" value="150"><br><br>
+
+    <label for="lightIntensity">Light Intensity:</label>
+    <input type="range" id="lightIntensity" min="0.1" max="2" step="0.1" value="1"><br><br>
+
+    <label for="renderDistance">Render Distance:</label>
+    <input type="range" id="renderDistance" min="1" max="5" step="1" value="2"><br><br>
+  </div>
+
+  <!-- Settings Info Menu -->
+  <div id="settingsInfo">
+    <h3>Settings Info</h3>
+    <p><strong>Mouse Sensitivity</strong>: Adjusts the speed of camera rotation with mouse movement.</p>
+    <p><strong>Movement Speed</strong>: Controls the speed at which the player moves.</p>
+    <p><strong>Jump Strength</strong>: Determines how high the player can jump.</p>
+    <p><strong>Field of View (FOV)</strong>: Changes the camera's FOV (wider or narrower view).</p>
+    <p><strong>Fog Near/Far</strong>: Adjusts how close or far the fog starts and ends.</p>
+    <p><strong>Light Intensity</strong>: Controls the brightness of the main directional light.</p>
+    <p><strong>Render Distance</strong>: Determines how many terrain chunks are loaded around the player.</p>
+  </div>
+  
+  <!-- FPS Counter -->
+  <div id="fpsCounter">FPS: 0</div>
+
+  <!-- Three.js and Simplex Noise Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/simplex-noise@2.4.0/simplex-noise.min.js"></script>
+
+  <script>
+    const scene = new THREE.Scene();
+
+    // ==================== Sky Shader Setup ====================
+    const skyColor = new THREE.Color(0xff8c00); // Orange
+    const groundColor = new THREE.Color(0xff8c00); // Orange to match
+    const skyGeometry = new THREE.SphereGeometry(500, 60, 40);
+
+    // Improved Shader Material with Enhanced Gradient
+    const skyMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        topColor: { value: new THREE.Color(0xff8c00) },    // Orange
+        bottomColor: { value: new THREE.Color(0xff8c00) }, // Orange
+        offset: { value: 33 },                             // Gradient position
+        exponent: { value: 0.6 }                           // Gradient smoothness
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+
+        void main() {
+          // Calculate the world position of the vertex
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          
+          // Project the vertex position to clip space
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        
+        varying vec3 vWorldPosition;
+
+        void main() {
+          // Normalize the world position vector and adjust with offset
+          float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
+          
+          // Apply smoothstep for a smoother gradient transition
+          float mixFactor = smoothstep(0.0, 1.0, pow(max(h, 0.0), exponent));
+          
+          // Mix the bottom and top colors based on the mix factor
+          vec3 skyColor = mix(bottomColor, topColor, mixFactor);
+          
+          // Set the fragment color
+          gl_FragColor = vec4(skyColor, 1.0);
+        }
+      `,
+      side: THREE.BackSide
+    });
+
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    scene.add(sky);
+    // ============================================================
+
+    // ==================== Camera and Renderer Setup ====================
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    // ===================================================================
+
+    // ==================== Lighting Setup ====================
+    const ambientLight = new THREE.AmbientLight(0x404040, 1); // Soft white light
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Main light
+    directionalLight.position.set(5, 10, 7.5).normalize();
+    scene.add(directionalLight);
+    // ============================================================
+
+    // ==================== Texture Loading ====================
+    const textureLoader = new THREE.TextureLoader();
+    const grassTexture = textureLoader.load('grass.jpg'); // Ensure 'grass.jpg' is optimized and in the correct path
+    const treeTexture = textureLoader.load('tree.png');   // Ensure 'tree.png' is optimized and in the correct path
+    const plantTexture = textureLoader.load('plant.png'); // Ensure 'plant.png' is optimized and in the correct path
+    // ==============================================================
+
+    // ==================== Creature Textures ====================
+    // List of creature PNGs from the "creatures" folder with URL-encoded names
+    const creatureTextures = [
+      encodeURI('creatures/coiol.png'),
+      encodeURI('creatures/geffry (1).png'),
+      encodeURI('creatures/geffry.png'),
+      encodeURI('creatures/kercho (1).png'),
+      encodeURI('creatures/kercho.png'),
+      encodeURI('creatures/sorlinkian.png'),
+      encodeURI('creatures/vinny (1).png'),
+      encodeURI('creatures/vinny past moon transition (1).png'),
+      encodeURI('creatures/zeblip (2).png'),
+      encodeURI('creatures/zeblip.png')
+    ];
+    // ==============================================================
+
+    // ==================== Player Setup ====================
+    let playerTexture = textureLoader.load(creatureTextures[0]);
+    let playerMaterial = new THREE.MeshLambertMaterial({ map: playerTexture });
+    const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const player = new THREE.Mesh(playerGeometry, playerMaterial);
+    player.position.set(0, 1.5, 0); // Starting position
+    scene.add(player);
+    // ============================================================
+
+    // ==================== Player Movement Variables ====================
+    let keys = {};
+    let playerDirection = new THREE.Vector3(0, 0, -1);
+    const simplex = new SimplexNoise();
+    const chunkSize = 16; // Reduced from 32 to 16
+    let noiseScale = 50; // Now dynamic via settings
+    let maxHeight = 20;
+    let renderDistance = 2; // Dynamic via settings
+    const unloadDistance = 3;
+
+    const loadedChunks = {};
+    const terrainBoxes = [];
+
+    const playerBox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+
+    const gravity = 0.02;
+    let velocityY = 0;
+    let isJumping = false;
+    let isOnGround = false;
+    let jumpStrength = 0.3;
+    // ===================================================================
+
+    // ==================== Event Listeners ====================
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+
+      // If settings menu is open and key is not 'f', ignore other controls
+      if (isSettingsOpen && key !== 'f') return;
+
+      keys[key] = true;
+
+      // Handle 'T' key press for toggling player light
+      if (key === 't') {
+        togglePlayerLight();
+      }
+
+      // Handle 'F' key press for toggling settings menu
+      if (key === 'f') {
+        toggleSettings();
+      }
+
+      // Handle 'G' key press for toggling gun
+      if (key === 'g') {
+        toggleGun();
+      }
+
+      // Handle 'E' key press for changing creature texture
+      if (key === 'e') {
+        applyRandomCreatureTexture();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+
+      // If settings menu is open and key is not 'f', ignore other controls
+      if (isSettingsOpen && key !== 'f') return;
+
+      keys[key] = false;
+    });
+
+    // Handle mouse clicks for mining, placing, and shooting
+    window.addEventListener('mousedown', (e) => {
+      if (isSettingsOpen) return; // Do not allow interactions when settings are open
+
+      if (e.button === 0) { // Left click: Place block or shoot based on mode
+        if (gunActive) {
+          shootGun();
+        } else if (e.shiftKey) {
+          shootProjectile();
+        } else {
+          placeBlock();
+        }
+      } else if (e.button === 2) { // Right click: Mine block
+        mineBlock();
+      }
+    });
+
+    // Prevent context menu on right-click
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+    // ============================================================
+
+    // ==================== Pointer Lock and Camera Control ====================
+    let isPointerLocked = false;
+    let sensitivity = 0.002;
+    let speed = 0.1;
+
+    document.addEventListener('click', () => {
+      if (!isPointerLocked && !isSettingsOpen) {
+        document.body.requestPointerLock();
+      }
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+      isPointerLocked = !!document.pointerLockElement;
+    });
+
+    let cameraRotationY = 0;
+    let cameraRotationX = 0;
+
+    document.addEventListener('mousemove', (event) => {
+      if (isPointerLocked && !isSettingsOpen) {
+        cameraRotationY += event.movementX * sensitivity;
+        cameraRotationX += event.movementY * sensitivity;
+        cameraRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotationX));
+
+        // Update player direction based on camera rotation
+        playerDirection.x = Math.sin(cameraRotationY);
+        playerDirection.z = -Math.cos(cameraRotationY);
+
+        camera.rotation.y = cameraRotationY;
+        camera.rotation.x = cameraRotationX;
+      }
+    });
+    // ===================================================================
+
+    camera.position.set(0, 5, 10);
+    camera.lookAt(player.position);
+
+    // ==================== Settings Controls ====================
+    document.getElementById('sensitivity').addEventListener('input', (e) => {
+      sensitivity = parseFloat(e.target.value);
+    });
+
+    document.getElementById('speed').addEventListener('input', (e) => {
+      speed = parseFloat(e.target.value);
+    });
+
+    document.getElementById('jumpStrength').addEventListener('input', (e) => {
+      jumpStrength = parseFloat(e.target.value);
+    });
+
+    document.getElementById('fov').addEventListener('input', (e) => {
+      camera.fov = parseFloat(e.target.value);
+      camera.updateProjectionMatrix();
+    });
+
+    document.getElementById('fogNear').addEventListener('input', (e) => {
+      scene.fog.near = parseFloat(e.target.value);
+    });
+
+    document.getElementById('fogFar').addEventListener('input', (e) => {
+      scene.fog.far = parseFloat(e.target.value);
+    });
+
+    document.getElementById('lightIntensity').addEventListener('input', (e) => {
+      directionalLight.intensity = parseFloat(e.target.value);
+    });
+
+    document.getElementById('renderDistance').addEventListener('input', (e) => {
+      renderDistance = parseInt(e.target.value);
+      // Regenerate chunks based on new render distance
+      regenerateChunks();
+    });
+    // ===================================================================
+
+    // ==================== Terrain Generation with InstancedMesh ====================
+    function generateChunk(x, z) {
+      const chunkGroup = new THREE.Group();
+
+      // Calculate the number of blocks per chunk
+      const numBlocks = chunkSize * chunkSize;
+
+      // Create an InstancedMesh for the terrain blocks
+      const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+      const blockMaterial = new THREE.MeshLambertMaterial({ map: grassTexture });
+      const instancedMesh = new THREE.InstancedMesh(blockGeometry, blockMaterial, numBlocks);
+      instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // Will be updated dynamically
+
+      let index = 0;
+
+      for (let i = 0; i < chunkSize; i++) {
+        for (let j = 0; j < chunkSize; j++) {
+          const worldX = x * chunkSize + i;
+          const worldZ = z * chunkSize + j;
+
+          // Primary noise layer
+          let height = Math.abs(simplex.noise2D(worldX / noiseScale, worldZ / noiseScale)) * maxHeight;
+
+          // Secondary noise layer for additional terrain variation
+          height += Math.abs(simplex.noise2D(worldX / (noiseScale / 2), worldZ / (noiseScale / 2))) * (maxHeight / 2);
+
+          height = Math.floor(height); // Ensure height is an integer for block alignment
+
+          if (height < 1) height = 1; // Minimum height to avoid invisible blocks
+
+          // Create a transformation matrix for each instance
+          const matrix = new THREE.Matrix4();
+          matrix.setPosition(worldX, height / 2, worldZ);
+          instancedMesh.setMatrixAt(index, matrix);
+
+          // Add bounding box for collision detection
+          const terrainBox = new THREE.Box3(
+            new THREE.Vector3(worldX - 0.5, 0, worldZ - 0.5),
+            new THREE.Vector3(worldX + 0.5, height, worldZ + 0.5)
+          );
+          terrainBoxes.push(terrainBox);
+
+          index++;
+        }
+      }
+
+      instancedMesh.instanceMatrix.needsUpdate = true;
+      chunkGroup.add(instancedMesh);
+      scene.add(chunkGroup);
+      return chunkGroup;
+    }
+
+    function updateChunks() {
+      const playerChunkX = Math.floor(player.position.x / chunkSize);
+      const playerChunkZ = Math.floor(player.position.z / chunkSize);
+
+      const newChunks = {};
+
+      for (let x = playerChunkX - renderDistance; x <= playerChunkX + renderDistance; x++) {
+        for (let z = playerChunkZ - renderDistance; z <= playerChunkZ + renderDistance; z++) {
+          const chunkKey = `${x},${z}`;
+          if (!loadedChunks[chunkKey]) {
+            loadedChunks[chunkKey] = generateChunk(x, z);
+          }
+          newChunks[chunkKey] = loadedChunks[chunkKey];
+        }
+      }
+
+      for (const chunkKey in loadedChunks) {
+        if (!newChunks[chunkKey]) {
+          const [x, z] = chunkKey.split(',').map(Number);
+          if (Math.abs(x - playerChunkX) > unloadDistance || Math.abs(z - playerChunkZ) > unloadDistance) {
+            scene.remove(loadedChunks[chunkKey]);
+            delete loadedChunks[chunkKey];
+          }
+        }
+      }
+
+      // After updating chunks, manage creature spawning/despawning
+      manageCreatures();
+    }
+
+    function regenerateChunks() {
+      // Remove all current chunks
+      for (const chunkKey in loadedChunks) {
+        scene.remove(loadedChunks[chunkKey]);
+        delete loadedChunks[chunkKey];
+      }
+      terrainBoxes.length = 0; // Clear terrain boxes
+
+      // Generate new chunks based on updated render distance
+      generateInitialChunks();
+
+      // Reset creatures
+      for (const creature of creatureInstances) {
+        creature.destroy();
+      }
+      creatureInstances.length = 0;
+    }
+    // ===================================================================
+
+    // ==================== Player Bounding Box and Collision ====================
+    function updatePlayerBoundingBox() {
+      playerBox.setFromObject(player);
+    }
+
+    function checkCollisionAndRepel(newPosition, direction) {
+      player.position.copy(newPosition);
+      updatePlayerBoundingBox();
+      for (let i = 0; i < terrainBoxes.length; i++) {
+        if (playerBox.intersectsBox(terrainBoxes[i])) {
+          player.position.add(direction.multiplyScalar(-0.1));
+          updatePlayerBoundingBox();
+          return true;
+        }
+      }
+      return false;
+    }
+    // ===================================================================
+
+    // ==================== Mining and Placing Blocks ====================
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function mineBlock() {
+      // Set raycaster from camera to player direction
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); // Center of the screen
+
+      // Find intersections with terrain
+      const intersects = raycaster.intersectObjects(scene.children, true);
+
+      if (intersects.length > 0) {
+        for (let intersect of intersects) {
+          const object = intersect.object;
+          // Ensure the object is a terrain block
+          if (object.material.map === grassTexture) {
+            // Remove the block from the scene
+            scene.remove(object);
+            // Remove from terrainBoxes
+            const index = terrainBoxes.indexOf(intersect.boundingBox);
+            if (index > -1) terrainBoxes.splice(index, 1);
+            break; // Only remove the first intersected block
+          }
+
+          // Check collision with creatures
+          if (object.userData.isCreature) {
+            // Remove creature
+            removeCreature(object);
+            // Remove projectile if necessary
+            break;
+          }
+        }
+      }
+    }
+
+    function placeBlock() {
+      // Set raycaster from camera to player direction
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); // Center of the screen
+
+      // Find intersections with terrain
+      const intersects = raycaster.intersectObjects(scene.children, true);
+
+      if (intersects.length > 0) {
+        const intersect = intersects[0];
+        const normal = intersect.face.normal;
+        const position = intersect.point.clone().add(normal.multiplyScalar(0.5)).floor().addScalar(0.5);
+
+        // Check if a block already exists at the position
+        const exists = scene.children.some(obj => obj.position.equals(position));
+
+        if (!exists) {
+          // Create a new block instance
+          const index = Object.keys(loadedChunks).length; // Simple index for demonstration
+
+          const matrix = new THREE.Matrix4();
+          matrix.setPosition(position);
+          // Assuming all blocks are in a single InstancedMesh for simplicity
+          // If multiple InstancedMeshes exist, identify the correct one
+          // For demonstration, this step is omitted
+
+          // Update InstancedMesh accordingly
+          // This requires managing instance counts dynamically, which can be complex
+          // Alternatively, use separate InstancedMeshes per chunk
+
+          // As an alternative, you can convert the terrain back to individual meshes
+          // but this negates performance benefits
+
+          // For simplicity, we skip placing new blocks dynamically in this optimized version
+          alert('Dynamic block placing is disabled in this optimized version.');
+        }
+      }
+    }
+    // ===================================================================
+
+    // ==================== Control Reversal for A and D ====================
+    // Adjust movement vectors for reversed A and D
+    function movePlayer() {
+      let actualSpeed = speed;
+      if (keys['shift']) {
+        actualSpeed *= 2;
+      }
+
+      let newPosition = player.position.clone();
+
+      if (keys['w']) {
+        newPosition.addScaledVector(playerDirection, actualSpeed);
+        if (!checkCollisionAndRepel(newPosition, playerDirection)) {
+          player.position.copy(newPosition);
+        }
+      }
+      if (keys['s']) {
+        newPosition.addScaledVector(playerDirection, -actualSpeed);
+        if (!checkCollisionAndRepel(newPosition, playerDirection.clone().negate())) {
+          player.position.copy(newPosition);
+        }
+      }
+
+      // Reversed 'a' and 'd' controls
+      if (keys['d']) { // Originally 'a' for left, now 'd' moves left
+        const leftDirection = new THREE.Vector3(-playerDirection.z, 0, playerDirection.x).normalize();
+        newPosition.add(leftDirection.multiplyScalar(actualSpeed));
+        if (!checkCollisionAndRepel(newPosition, leftDirection)) {
+          player.position.copy(newPosition);
+        }
+      }
+      if (keys['a']) { // Originally 'd' for right, now 'a' moves right
+        const rightDirection = new THREE.Vector3(playerDirection.z, 0, -playerDirection.x).normalize();
+        newPosition.add(rightDirection.multiplyScalar(actualSpeed));
+        if (!checkCollisionAndRepel(newPosition, rightDirection)) {
+          player.position.copy(newPosition);
+        }
+      }
+
+      // Gravity and Jumping
+      isOnGround = false;
+      updatePlayerBoundingBox();
+      for (let i = 0; i < terrainBoxes.length; i++) {
+        if (playerBox.intersectsBox(terrainBoxes[i])) {
+          isOnGround = true;
+          velocityY = 0;
+          player.position.y += 0.05;
+          break;
+        }
+      }
+
+      if (keys[' '] && isOnGround && !isJumping) {
+        velocityY = jumpStrength;
+        isJumping = true;
+      }
+
+      velocityY -= gravity;
+      newPosition = player.position.clone();
+      newPosition.y += velocityY;
+
+      if (!checkCollisionAndRepel(newPosition, new THREE.Vector3(0, -1, 0))) {
+        player.position.copy(newPosition);
+      } else {
+        isJumping = false;
+      }
+
+      // Reset player position if fallen below a threshold
+      if (player.position.y < -20) {
+        location.reload();
+      }
+
+      // Update camera position relative to player
+      camera.position.set(
+        player.position.x - Math.sin(cameraRotationY) * 10,
+        player.position.y + 5 + Math.sin(cameraRotationX) * 5,
+        player.position.z + Math.cos(cameraRotationY) * 10
+      );
+      camera.lookAt(player.position);
+    }
+    // ===================================================================
+
+    // ==================== FPS Counter ====================
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fpsDisplay = document.getElementById('fpsCounter');
+
+    function updateFPS() {
+      const currentTime = performance.now();
+      const delta = currentTime - lastTime;
+      frameCount++;
+      if (delta >= 1000) {
+        const fps = Math.round((frameCount * 1000) / delta);
+        fpsDisplay.innerText = `FPS: ${fps}`;
+        frameCount = 0;
+        lastTime = currentTime;
+      }
+    }
+    // ===================================================================
+
+    // ==================== Player Light Source ====================
+    let playerLight = null;      // PointLight attached to the player
+    let playerGlow = null;       // Glow effect around the player
+    let isLightOn = false;       // Light toggle state
+
+    function createPlayerLight() {
+      // Create a PointLight with orange color and properties
+      playerLight = new THREE.PointLight(0xff8c00, 1.5, 50); // Orange light
+      playerLight.position.set(0, 0, 0);
+      player.add(playerLight); // Attach to player
+
+      // Create a glow effect using a transparent sphere
+      const glowGeometry = new THREE.SphereGeometry(1.2, 32, 32);
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff8c00,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending
+      });
+      playerGlow = new THREE.Mesh(glowGeometry, glowMaterial);
+      player.add(playerGlow); // Attach to player
+    }
+
+    function removePlayerLight() {
+      if (playerLight) {
+        player.remove(playerLight);
+        playerLight = null;
+      }
+      if (playerGlow) {
+        player.remove(playerGlow);
+        playerGlow = null;
+      }
+    }
+
+    function togglePlayerLight() {
+      if (isLightOn) {
+        removePlayerLight();
+        isLightOn = false;
+      } else {
+        createPlayerLight();
+        isLightOn = true;
+      }
+    }
+    // ===================================================================
+
+    // ==================== Shooting Projectiles ====================
+    const projectiles = []; // Array to hold active projectiles
+    const maxProjectiles = 50; // Maximum number of active projectiles
+
+    function shootProjectile() {
+      if (projectiles.length >= maxProjectiles) return; // Prevent shooting if limit is reached
+
+      const projectileGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+      const projectileMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      });
+      const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+
+      // Set initial position at player's position
+      projectile.position.copy(player.position);
+
+      // Calculate direction based on camera rotation
+      const direction = new THREE.Vector3(0, 0, -1);
+      direction.applyEuler(camera.rotation);
+      direction.normalize();
+
+      // Set velocity
+      projectile.userData.velocity = direction.clone().multiplyScalar(1); // Adjust speed as needed
+
+      scene.add(projectile);
+      projectiles.push(projectile);
+    }
+
+    function shootGun() {
+      if (projectiles.length >= maxProjectiles) return; // Prevent shooting if limit is reached
+
+      const gunProjectileGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+      const gunProjectileMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000, // Different color for gun projectiles
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      });
+      const gunProjectile = new THREE.Mesh(gunProjectileGeometry, gunProjectileMaterial);
+
+      // Set initial position slightly in front of the camera
+      const offset = new THREE.Vector3(0, 0, -1.5);
+      offset.applyEuler(camera.rotation);
+      gunProjectile.position.copy(player.position).add(offset);
+
+      // Calculate direction based on camera rotation
+      const direction = new THREE.Vector3(0, 0, -1);
+      direction.applyEuler(camera.rotation);
+      direction.normalize();
+
+      // Set velocity
+      gunProjectile.userData.velocity = direction.clone().multiplyScalar(2); // Faster speed for gun
+
+      scene.add(gunProjectile);
+      projectiles.push(gunProjectile);
+    }
+
+    function updateProjectiles() {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const projectile = projectiles[i];
+        // Move projectile
+        projectile.position.add(projectile.userData.velocity);
+
+        // Check collision with terrain and creatures
+        raycaster.set(projectile.position, projectile.userData.velocity.clone().normalize());
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        for (let intersect of intersects) {
+          const object = intersect.object;
+          if (object.material.map === grassTexture) {
+            // Destroy blocks within a radius
+            destroyBlocksInRadius(intersect.point, 3); // Radius of 3 units
+            // Remove projectile
+            scene.remove(projectile);
+            projectiles.splice(i, 1);
+            break;
+          }
+
+          // Check collision with creatures
+          if (object.userData.isCreature) {
+            // Remove creature
+            removeCreature(object);
+            // Remove projectile
+            scene.remove(projectile);
+            projectiles.splice(i, 1);
+            break;
+          }
+        }
+
+        // Remove projectile if it goes out of bounds
+        if (projectile.position.length() > 1000) {
+          scene.remove(projectile);
+          projectiles.splice(i, 1);
+        }
+      }
+    }
+
+    function destroyBlocksInRadius(position, radius) {
+      const affectedBlocks = [];
+      for (let obj of scene.children) {
+        if (obj.material.map === grassTexture) {
+          const distance = obj.position.distanceTo(position);
+          if (distance <= radius) {
+            affectedBlocks.push(obj);
+          }
+        }
+      }
+
+      for (let block of affectedBlocks) {
+        scene.remove(block);
+        // Remove from terrainBoxes
+        const index = terrainBoxes.indexOf(block.geometry.boundingBox);
+        if (index > -1) terrainBoxes.splice(index, 1);
+      }
+    }
+    // ===================================================================
+
+    // ==================== Gun Toggle Feature ====================
+    let gunActive = false; // Track gun state
+    let gunModel = null;   // Reference to the gun model
+
+    function createGunModel() {
+      const gun = new THREE.Group();
+
+      // Main gun body
+      const bodyGeometry = new THREE.BoxGeometry(0.5, 0.2, 1);
+      const bodyMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      body.position.set(0.3, -0.1, -1);
+      gun.add(body);
+
+      // Barrel
+      const barrelGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.5, 16);
+      const barrelMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+      barrel.rotation.z = Math.PI / 2;
+      barrel.position.set(0.5, -0.1, -1);
+      gun.add(barrel);
+
+      // Add glow effect to gun (optional)
+      const glowGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending
+      });
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.position.set(0.6, -0.1, -1);
+      gun.add(glow);
+
+      return gun;
+    }
+
+    function toggleGun() {
+      if (gunActive) {
+        // Remove gun model from camera
+        camera.remove(gunModel);
+        gunModel = null;
+        gunActive = false;
+      } else {
+        // Create and add gun model to camera
+        gunModel = createGunModel();
+        camera.add(gunModel);
+        gunActive = true;
+      }
+    }
+    // ===================================================================
+
+    // ==================== Apply Random Creature Texture on 'E' Key ====================
+    function applyRandomCreatureTexture() {
+      const randomIndex = Math.floor(Math.random() * creatureTextures.length);
+      const randomCreature = creatureTextures[randomIndex];
+      textureLoader.load(randomCreature, (newTexture) => {
+        player.material.map = newTexture;
+        player.material.needsUpdate = true;
+      });
+    }
+    // ===================================================================
+
+    // ==================== Settings Menu Toggle with 'F' Key ====================
+    let isSettingsOpen = false; // Track settings menu state
+
+    // Reference to settings elements
+    const settingsButton = document.getElementById('settingsButton');
+    const settingsMenu = document.getElementById('settings');
+    const settingsInfo = document.getElementById('settingsInfo');
+
+    // Function to toggle settings menu
+    function toggleSettings() {
+      if (isSettingsOpen) {
+        // Close settings menu
+        settingsMenu.style.display = 'none';
+        settingsInfo.style.display = 'none';
+        isSettingsOpen = false;
+
+        // Re-enable controls by requesting pointer lock if not already locked
+        if (!isPointerLocked) {
+          document.body.requestPointerLock();
+        }
+      } else {
+        // Open settings menu
+        settingsMenu.style.display = 'block';
+        settingsInfo.style.display = 'block';
+        isSettingsOpen = true;
+
+        // Disable pointer lock to allow UI interaction
+        if (isPointerLocked) {
+          document.exitPointerLock();
+        }
+      }
+    }
+
+    // Event listener for settings button click
+    settingsButton.addEventListener('click', () => {
+      toggleSettings();
+    });
+    // ===================================================================
+
+    // ==================== Animation Loop ====================
+    function animate() {
+      requestAnimationFrame(animate);
+      movePlayer();
+      updateChunks();
+      updateCreatures();
+      updateProjectiles(); // Update projectiles each frame
+      renderer.render(scene, camera);
+      updateFPS();
+
+      // Optional: Animate sky shader parameters for dynamic effect
+      /*
+      const elapsed = performance.now() / 1000;
+      skyMaterial.uniforms.offset.value = 33 + Math.sin(elapsed * 0.1) * 10;
+      skyMaterial.uniforms.exponent.value = 0.6 + Math.cos(elapsed * 0.1) * 0.1;
+      */
+
+      // Dynamic light color (example: cycling through hues)
+      if (isLightOn && playerLight) {
+        const time = Date.now() * 0.001;
+        playerLight.color.setHSL((time * 0.1) % 1, 0.7, 0.5);
+        if (playerGlow) {
+          playerGlow.material.color.setHSL((time * 0.1) % 1, 0.7, 0.5);
+        }
+      }
+    }
+    // ===================================================================
+
+    // ==================== Initial Terrain Generation ====================
+    // Generate initial chunks around the player
+    generateInitialChunks();
+
+    function generateInitialChunks() {
+      const playerChunkX = Math.floor(player.position.x / chunkSize);
+      const playerChunkZ = Math.floor(player.position.z / chunkSize);
+
+      for (let x = playerChunkX - renderDistance; x <= playerChunkX + renderDistance; x++) {
+        for (let z = playerChunkZ - renderDistance; z <= playerChunkZ + renderDistance; z++) {
+          const chunkKey = `${x},${z}`;
+          if (!loadedChunks[chunkKey]) {
+            loadedChunks[chunkKey] = generateChunk(x, z);
+          }
+        }
+      }
+    }
+    // ===================================================================
+
+    // ==================== Fog Setup ====================
+    // Set fog color to match the orange color of the sky
+    scene.fog = new THREE.Fog(0xff8c00, 10, 150); // Changed from 0x87ceeb to 0xff8c00
+    // ============================================================
+
+    // ==================== Enable and Optimize Culling ====================
+    // Three.js enables frustum culling by default on Mesh objects.
+    // To further optimize, ensure that objects are correctly flagged for culling.
+
+    // Example: Enable frustum culling explicitly (optional)
+    scene.traverse(function(child) {
+      if (child instanceof THREE.Mesh) {
+        child.frustumCulled = true; // Ensure frustum culling is enabled
+      }
+    });
+
+    // ============================================================
+
+    // ==================== Creature Implementation ====================
+    const creatureInstances = []; // Array to hold active creature instances
+    const maxCreatures = 10; // Maximum number of creatures within render distance
+
+    // Creature Class
+    class Creature {
+      constructor(position) {
+        // Randomly select a texture
+        const textureIndex = Math.floor(Math.random() * creatureTextures.length);
+        const texture = textureLoader.load(creatureTextures[textureIndex]);
+
+        const material = new THREE.MeshLambertMaterial({ map: texture });
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.copy(position);
+        this.mesh.userData.isCreature = true; // Flag for collision detection
+        scene.add(this.mesh);
+
+        // Movement variables
+        this.velocity = new THREE.Vector3();
+        this.speed = 0.05 + Math.random() * 0.05; // Random speed between 0.05 and 0.1
+        this.jumpCooldown = 0; // Timer for jumping
+        this.following = Math.random() < 0.1; // 10% chance to follow player
+      }
+
+      update() {
+        if (this.following) {
+          // Move towards player
+          const direction = new THREE.Vector3().subVectors(player.position, this.mesh.position).normalize();
+          this.velocity.add(direction.multiplyScalar(this.speed));
+        } else {
+          // Random movement
+          if (Math.random() < 0.02) { // 2% chance to change direction
+            this.velocity = new THREE.Vector3(
+              (Math.random() - 0.5) * this.speed,
+              0,
+              (Math.random() - 0.5) * this.speed
+            );
+          }
+
+          // Random jumping
+          if (this.jumpCooldown <= 0 && Math.random() < 0.01) { // 1% chance to jump
+            this.velocity.y = 0.3; // Jump strength
+            this.jumpCooldown = 100; // Cooldown frames
+          }
+
+          this.jumpCooldown--;
+        }
+
+        // Apply gravity
+        this.velocity.y -= gravity;
+
+        // Update position
+        const newPosition = this.mesh.position.clone().add(this.velocity);
+
+        // Simple collision with ground (y=0)
+        if (newPosition.y < 0.5) {
+          newPosition.y = 0.5;
+          this.velocity.y = 0;
+        }
+
+        this.mesh.position.copy(newPosition);
+
+        // Reset horizontal velocity for next frame
+        this.velocity.x *= 0.9;
+        this.velocity.z *= 0.9;
+      }
+
+      destroy() {
+        scene.remove(this.mesh);
+      }
+    }
+
+    // Function to manage creatures based on render distance
+    function manageCreatures() {
+      // Calculate how many creatures should be present based on render distance
+      const desiredCreatures = Math.min(maxCreatures, renderDistance * renderDistance * 4); // Example formula
+
+      while (creatureInstances.length < desiredCreatures && creatureInstances.length < maxCreatures) {
+        // Spawn creatures within render distance
+        const offsetX = Math.floor(Math.random() * (renderDistance * chunkSize * 2)) - (renderDistance * chunkSize);
+        const offsetZ = Math.floor(Math.random() * (renderDistance * chunkSize * 2)) - (renderDistance * chunkSize);
+        const spawnX = player.position.x + offsetX;
+        const spawnZ = player.position.z + offsetZ;
+        const spawnY = getTerrainHeight(spawnX, spawnZ) + 1; // Spawn above terrain
+
+        const creature = new Creature(new THREE.Vector3(spawnX, spawnY, spawnZ));
+        creatureInstances.push(creature);
+
+        if (creatureInstances.length >= maxCreatures) break;
+      }
+
+      // Remove creatures that are outside the render distance
+      for (let i = creatureInstances.length - 1; i >= 0; i--) {
+        const creature = creatureInstances[i];
+        const distance = player.position.distanceTo(creature.mesh.position);
+        if (distance > renderDistance * chunkSize) {
+          creature.destroy();
+          creatureInstances.splice(i, 1);
+        }
+      }
+    }
+
+    // Function to get terrain height at specific coordinates
+    function getTerrainHeight(x, z) {
+      const noiseValue = simplex.noise2D(x / noiseScale, z / noiseScale);
+      let height = Math.abs(noiseValue) * maxHeight;
+      height += Math.abs(simplex.noise2D(x / (noiseScale / 2), z / (noiseScale / 2))) * (maxHeight / 2);
+      height = Math.floor(height);
+      return Math.max(height, 1);
+    }
+
+    // Function to update all creatures
+    function updateCreatures() {
+      for (let creature of creatureInstances) {
+        creature.update();
+      }
+    }
+
+    // Function to remove a creature upon collision
+    function removeCreature(creatureMesh) {
+      for (let i = 0; i < creatureInstances.length; i++) {
+        if (creatureInstances[i].mesh === creatureMesh) {
+          creatureInstances[i].destroy();
+          creatureInstances.splice(i, 1);
+          break;
+        }
+      }
+    }
+    // ===================================================================
+
+    // ==================== Creature Culling and Spawn/Despawn ====================
+    // Managed within manageCreatures() and updateChunks()
+    // ===================================================================
+
+    // ==================== Animation Loop ====================
+    function animate() {
+      requestAnimationFrame(animate);
+      movePlayer();
+      updateChunks();
+      updateCreatures();
+      updateProjectiles(); // Update projectiles each frame
+      renderer.render(scene, camera);
+      updateFPS();
+
+      // Optional: Animate sky shader parameters for dynamic effect
+      /*
+      const elapsed = performance.now() / 1000;
+      skyMaterial.uniforms.offset.value = 33 + Math.sin(elapsed * 0.1) * 10;
+      skyMaterial.uniforms.exponent.value = 0.6 + Math.cos(elapsed * 0.1) * 0.1;
+      */
+
+      // Dynamic light color (example: cycling through hues)
+      if (isLightOn && playerLight) {
+        const time = Date.now() * 0.001;
+        playerLight.color.setHSL((time * 0.1) % 1, 0.7, 0.5);
+        if (playerGlow) {
+          playerGlow.material.color.setHSL((time * 0.1) % 1, 0.7, 0.5);
+        }
+      }
+    }
+    // ===================================================================
+
+    // ==================== Initial Terrain Generation ====================
+    // Generate initial chunks around the player
+    generateInitialChunks();
+
+    function generateInitialChunks() {
+      const playerChunkX = Math.floor(player.position.x / chunkSize);
+      const playerChunkZ = Math.floor(player.position.z / chunkSize);
+
+      for (let x = playerChunkX - renderDistance; x <= playerChunkX + renderDistance; x++) {
+        for (let z = playerChunkZ - renderDistance; z <= playerChunkZ + renderDistance; z++) {
+          const chunkKey = `${x},${z}`;
+          if (!loadedChunks[chunkKey]) {
+            loadedChunks[chunkKey] = generateChunk(x, z);
+          }
+        }
+      }
+    }
+    // ===================================================================
+
+    // ==================== Fog Setup ====================
+    // Set fog color to match the orange color of the sky
+    scene.fog = new THREE.Fog(0xff8c00, 10, 150); // Changed from 0x87ceeb to 0xff8c00
+    // ============================================================
+
+    // ==================== Enable and Optimize Culling ====================
+    // Three.js enables frustum culling by default on Mesh objects.
+    // To further optimize, ensure that objects are correctly flagged for culling.
+
+    // Example: Enable frustum culling explicitly (optional)
+    scene.traverse(function(child) {
+      if (child instanceof THREE.Mesh) {
+        child.frustumCulled = true; // Ensure frustum culling is enabled
+      }
+    });
+
+    // ============================================================
+
+    // ==================== Prevent Default Behavior for Certain Keys ====================
+    window.addEventListener('keydown', (e) => {
+      // Prevent default actions for space and arrow keys to avoid unwanted scrolling
+      if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+    // ===================================================================
+
+    // ==================== Start Animation ====================
+    animate();
+    // ===================================================================
+  </script>
+</body>
+</html>

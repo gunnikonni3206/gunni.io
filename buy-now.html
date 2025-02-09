@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buy Spore Now</title>
+    <link rel="stylesheet" href="sporestyles.css">
+    <style>
+        /* Glitch effect styles */
+        .glitch {
+            font-family: "Courier New", Courier, monospace;
+            color: #ff0000;
+            font-size: 1.5em;
+            text-shadow: 0 0 5px rgba(255, 0, 0, 0.5), 0 0 10px rgba(0, 0, 255, 0.5);
+            animation: glitch-animation 1s infinite;
+        }
+
+        @keyframes glitch-animation {
+            0% {
+                text-shadow: 0 0 5px rgba(255, 0, 0, 0.5), 0 0 10px rgba(0, 0, 255, 0.5);
+            }
+            20% {
+                text-shadow: 5px -5px rgba(255, 0, 0, 0.5), -5px 5px rgba(0, 0, 255, 0.5);
+            }
+            40% {
+                text-shadow: -5px 5px rgba(255, 0, 0, 0.5), 5px -5px rgba(0, 0, 255, 0.5);
+            }
+            60% {
+                text-shadow: 0 0 5px rgba(255, 0, 0, 0.5), 0 0 10px rgba(0, 0, 255, 0.5);
+            }
+            80% {
+                text-shadow: -5px -5px rgba(255, 0, 0, 0.5), 5px 5px rgba(0, 0, 255, 0.5);
+            }
+            100% {
+                text-shadow: 0 0 5px rgba(255, 0, 0, 0.5), 0 0 10px rgba(0, 0, 255, 0.5);
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="what-is-spore.html">What is Spore</a></li>
+                <li><a href="get-spore.html">Get Spore</a></li>
+                <li><a href="sporepedia.html">Sporepedia</a></li>
+                <li><a href="community.html">Community</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section class="content">
+        <h1>Buy Spore Now</h1>
+        <p>Thank you for your interest in buying Spore. Click the link below to proceed to checkout.</p>
+        <a href="#" class="cta-button" id="checkout-button">Proceed to Checkout</a>
+        <p id="message" class="glitch" style="display: none;"></p> <!-- Hidden message that will display on glitch -->
+    </section>
+
+    <footer>
+        <p>Popular Platforms: Wii, PC, Xbox, PS3...</p>
+        <p>&copy; 2024 EA, Maxis. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // JavaScript to handle the click event and simulate a glitch message
+        document.getElementById('checkout-button').addEventListener('click', function(event) {
+            event.preventDefault(); // Prevent the default link behavior
+            let message = document.getElementById('message');
+
+            // Display the glitch message
+            message.style.display = 'block';
+            message.innerHTML = 'Insufficient funds, never try again!';
+
+            // Disable the button after the click
+            this.innerHTML = 'ERROR';
+            this.style.pointerEvents = 'none';
+        });
+    </script>
+</body>
+</html>

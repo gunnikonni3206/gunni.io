@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Quest</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: #00ff00;
+        }
+
+        p {
+            font-size: 1.5em;
+        }
+
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #00ff00;
+            color: #000;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .back-button:hover {
+            background-color: #fff;
+            color: #00ff00;
+        }
+
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #00ff00;
+            background-color: #222;
+        }
+
+        .score {
+            font-size: 1.5em;
+            color: #00ff00;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+        .game-over {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .restart-button {
+            padding: 10px 20px;
+            background-color: #00ff00;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .restart-button:hover {
+            background-color: #fff;
+            color: #00ff00;
+        }
+
+        .upgrade-options {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .upgrade-button {
+            padding: 10px 20px;
+            background-color: #00ff00;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        .upgrade-button:hover {
+            background-color: #fff;
+            color: #00ff00;
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 5px;
+            background-color: #ff0000;
+            position: relative;
+            margin-top: 5px;
+        }
+
+        .health {
+            height: 100%;
+            background-color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Pixel Quest</h1>
+    <p>Embark on a quest to save the pixel kingdom! Solve puzzles, defeat enemies, and restore peace to the land.</p>
+
+    <div class="score">Score: 0</div>
+    <div id="gameOver" class="game-over">
+        <h2>Game Over!</h2>
+        <p>Your final score is: <span id="finalScore">0</span></p>
+        <button class="restart-button" onclick="restartGame()">Restart Game</button>
+        <a class="back-button" href="games.html">Back to Games</a>
+    </div>
+
+    <div id="upgradeOptions" class="upgrade-options">
+        <h2>Choose Your Upgrade:</h2>
+        <button class="upgrade-button" onclick="selectUpgrade(0)">Speed Upgrade</button>
+        <button class="upgrade-button" onclick="selectUpgrade(1)">Bullet Damage Upgrade</button>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.querySelector('.score');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const upgradeOptions = document.getElementById('upgradeOptions');
+
+        let score = 0;
+        let gameActive = true;
+        let round = 1; // Track the current round
+
+        // Player settings
+        const player = {
+            x: 50,
+            y: 50,
+            size: 32,
+            color: '#00ff00',
+            speed: 5,
+            health: 100, // Player health
+            upgrades: [0, 0], // [speed, bullet damage]
+            direction: { x: 1, y: 0 } // Initial facing direction (right)
+        };
+
+        // Collectible item settings
+        const items = [];
+        const itemCount = 5;
+
+        // Enemy settings
+        const enemies = [];
+        let enemyCount = 3; // Start with 3 enemies
+
+        // Bullets
+        const bullets = [];
+        const bulletSpeed = 7;
+
+        for (let i = 0; i < itemCount; i++) {
+            items.push({
+                x: Math.random() * (canvas.width - 20) + 10,
+                y: Math.random() * (canvas.height - 20) + 10,
+                size: 20,
+                color: '#ffcc00'
+            });
+        }
+
+        for (let i = 0; i < enemyCount; i++) {
+            spawnEnemy();
+        }
+
+        // Player movement
+        let keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Shoot bullets on Space key press
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && gameActive) {
+                const bullet = {
+                    x: player.x + player.size / 2 - 2.5, // Center bullet horizontally
+                    y: player.y + player.size / 2 - 2.5, // Center bullet vertically
+                    size: 5,
+                    color: '#ffffff',
+                    dx: player.direction.x * bulletSpeed, // Shoot in the direction the player is facing
+                    dy: player.direction.y * bulletSpeed
+                };
+                bullets.push(bullet);
+            }
+        });
+
+        function spawnEnemy() {
+            enemies.push({
+                x: Math.random() * (canvas.width - 20) + 10,
+                y: Math.random() * (canvas.height - 20) + 10,
+                size: 20,
+                color: '#ff0000',
+                health: 50, // Enemy health
+                dx: (Math.random() < 0.5 ? 1 : -1) * 2, // Random direction
+                dy: (Math.random() < 0.5 ? 1 : -1) * 2  // Random direction
+            });
+        }
+
+        function movePlayer() {
+            if (keys['ArrowUp'] && player.y > 0) {
+                player.y -= player.speed;
+                player.direction.y = -1; // Up
+                player.direction.x = 0; // Facing up
+            }
+            if (keys['ArrowDown'] && player.y < canvas.height - player.size) {
+                player.y += player.speed;
+                player.direction.y = 1; // Down
+                player.direction.x = 0; // Facing down
+            }
+            if (keys['ArrowLeft'] && player.x > 0) {
+                player.x -= player.speed;
+                player.direction.x = -1; // Left
+                player.direction.y = 0; // Facing left
+            }
+            if (keys['ArrowRight'] && player.x < canvas.width - player.size) {
+                player.x += player.speed;
+                player.direction.x = 1; // Right
+                player.direction.y = 0; // Facing right
+            }
+        }
+
+        function gameLoop() {
+            if (!gameActive) return; // Stop the game if not active
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
+
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+            drawHealthBar(player.x, player.y, player.health, 100); // Draw player health bar
+
+            // Draw items
+            items.forEach(item => {
+                ctx.fillStyle = item.color;
+                ctx.fillRect(item.x, item.y, item.size, item.size);
+                // Check for collision with player
+                if (player.x < item.x + item.size &&
+                    player.x + player.size > item.x &&
+                    player.y < item.y + item.size &&
+                    player.y + player.size > item.y) {
+                    // Collision detected, increase score and remove item
+                    score++;
+                    scoreDisplay.innerText = 'Score: ' + score;
+                    item.x = -100; // Move item off-screen
+                    item.y = -100; // Move item off-screen
+                }
+            });
+
+            // Draw enemies and update their position
+            enemies.forEach((enemy, enemyIndex) => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+                drawHealthBar(enemy.x, enemy.y, enemy.health, 50); // Draw enemy health bar
+                enemy.x += enemy.dx;
+                enemy.y += enemy.dy;
+
+                // Bounce off walls
+                if (enemy.x < 0 || enemy.x + enemy.size > canvas.width) {
+                    enemy.dx *= -1;
+                }
+                if (enemy.y < 0 || enemy.y + enemy.size > canvas.height) {
+                    enemy.dy *= -1;
+                }
+
+                // Check for collision with player
+                if (player.x < enemy.x + enemy.size &&
+                    player.x + player.size > enemy.x &&
+                    player.y < enemy.y + enemy.size &&
+                    player.y + player.size > enemy.y) {
+                    // Collision detected, decrease player health
+                    player.health -= 10; // Reduce player health
+                    if (player.health <= 0) {
+                        gameActive = false;
+                        finalScoreDisplay.innerText = score;
+                        gameOverScreen.style.display = 'block'; // Show game over screen
+                    }
+                }
+            });
+
+            // Draw bullets and update their position
+            bullets.forEach((bullet, index) => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.size, bullet.size);
+                bullet.x += bullet.dx;
+                bullet.y += bullet.dy;
+
+                // Check for collision with enemies
+                enemies.forEach((enemy, enemyIndex) => {
+                    if (bullet.x < enemy.x + enemy.size &&
+                        bullet.x + bullet.size > enemy.x &&
+                        bullet.y < enemy.y + enemy.size &&
+                        bullet.y + bullet.size > enemy.y) {
+                        // Collision detected, remove bullet and reduce enemy health
+                        bullets.splice(index, 1);
+                        enemy.health -= player.upgrades[1] + 1; // Apply bullet damage
+
+                        // Check if enemy health is zero
+                        if (enemy.health <= 0) {
+                            enemies.splice(enemyIndex, 1);
+                            score += 2; // Increase score for defeating an enemy
+                        }
+
+                        scoreDisplay.innerText = 'Score: ' + score;
+                    }
+                });
+
+                // Remove bullet if it goes off-screen
+                if (bullet.y < 0 || bullet.x < 0 || bullet.x > canvas.width) {
+                    bullets.splice(index, 1);
+                }
+            });
+
+            movePlayer(); // Move player
+
+            // Check for upgrades after collecting all points
+            if (items.every(item => item.x < 0)) {
+                round++; // Increase round
+                enemyCount += 1; // Increase number of enemies
+                for (let i = 0; i < enemyCount; i++) {
+                    spawnEnemy(); // Spawn more enemies
+                }
+                showUpgradeOptions(); // Show upgrade options
+            }
+
+            requestAnimationFrame(gameLoop); // Call the game loop again
+        }
+
+        function drawHealthBar(x, y, health, maxHealth) {
+            ctx.fillStyle = '#ff0000'; // Background for health bar
+            ctx.fillRect(x, y - 10, maxHealth, 5);
+            ctx.fillStyle = '#00ff00'; // Current health
+            ctx.fillRect(x, y - 10, health, 5);
+        }
+
+        function showUpgradeOptions() {
+            gameActive = false; // Stop the game
+            upgradeOptions.style.display = 'block'; // Show upgrade options
+            const upgrade1 = document.querySelector('.upgrade-button:nth-child(1)');
+            const upgrade2 = document.querySelector('.upgrade-button:nth-child(2)');
+            upgrade1.innerText = 'Speed Upgrade';
+            upgrade2.innerText = 'Bullet Damage Upgrade';
+        }
+
+        function selectUpgrade(option) {
+            if (option === 0) {
+                player.speed += 2; // Increase speed
+            } else {
+                player.upgrades[1] += 1; // Increase bullet damage
+            }
+            upgradeOptions.style.display = 'none'; // Hide upgrade options
+            items.forEach(item => { // Respawn items
+                item.x = Math.random() * (canvas.width - 20) + 10;
+                item.y = Math.random() * (canvas.height - 20) + 10;
+            });
+            gameActive = true; // Resume game
+            gameLoop(); // Start the game loop again
+        }
+
+        function restartGame() {
+            gameActive = true; // Reset game state
+            score = 0; // Reset score
+            scoreDisplay.innerText = 'Score: 0'; // Reset score display
+            gameOverScreen.style.display = 'none'; // Hide game over screen
+            player.x = 50; // Reset player position
+            player.y = 50; // Reset player position
+            player.health = 100; // Reset player health
+            items.forEach(item => {
+                item.x = Math.random() * (canvas.width - 20) + 10;
+                item.y = Math.random() * (canvas.height - 20) + 10;
+            });
+            enemies.length = 0; // Clear enemies
+            enemyCount = 3; // Reset enemy count
+            for (let i = 0; i < enemyCount; i++) {
+                spawnEnemy(); // Spawn enemies
+            }
+            bullets.length = 0; // Clear bullets
+            gameLoop(); // Start the game loop
+        }
+
+        gameLoop(); // Start the game loop
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Tile-Based City Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #dialogueBox {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: none;
+            font-family: Arial, sans-serif;
+            z-index: 10;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="dialogueBox">Hello! Welcome to the city.</div>
+
+    <script>
+        // Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const dialogueBox = document.getElementById('dialogueBox');
+
+        // Set canvas to full window size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Tile Settings
+        const TILE_SIZE = 64; // Size of each tile in pixels
+        const MAP_ROWS = 100; // Total rows in the map
+        const MAP_COLS = 100; // Total columns in the map
+
+        // Map Representation
+        let map = [];
+
+        // Assets
+        const assets = {
+            water: new Image(),
+            grass: new Image(),
+            rock: new Image(),
+            shopKeeper: new Image(),
+            buildingTypes: [],
+            pathway: new Image(),
+            road: new Image(),
+            player: new Image(),
+        };
+
+        // Load Asset Images
+        assets.water.src = 'https://i.pinimg.com/originals/89/9d/da/899dda241eca5e959d9d945f45aba682.gif';
+        assets.grass.src = 'https://media4.giphy.com/media/3osxYsSSxjWhZw0BUY/200w.gif?cid=6c09b952m7cwy49vc8pjtbbw6zgyqwfu2icuj508g31b98i6&ep=v1_gifs_search&rid=200w.gif&ct=g';
+        assets.rock.src = 'https://media.baamboozle.com/uploads/images/998121/da062993-1e85-4c92-b264-563af0a4fafd.gif';
+        assets.shopKeeper.src = 'https://media.tenor.com/kh5mr3peEloAAAAM/temmie-h-oi.gif';
+        assets.pathway.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/a6b4bea7-b8e4-460e-91e9-99b6ebd930fa/d7l2g11-d008f833-f5c0-4b5d-8648-f2896d90474b.png'; // Replace with actual URL
+        assets.road.src = 'https://www.shutterstock.com/image-vector/asphalt-pixel-texture-seamles-background-260nw-225256015.jpg';
+
+        // Building Images
+        const buildingURLs = [
+            'https://i.redd.it/2d5yxil94ctz.png',
+            'https://e7.pngegg.com/pngimages/656/900/png-clipart-empire-state-building-pixel-art-building-building-skyscraper.png',
+            'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/7306d3b0-333f-4082-9212-b927245064bc/d38vkha-f8aca1a3-4205-4877-8fa4-60f928d49bb5.png', // Truncated URL
+            // Add more building URLs as needed
+        ];
+
+        buildingURLs.forEach(url => {
+            const img = new Image();
+            img.src = url;
+            assets.buildingTypes.push(img);
+        });
+
+        // Player Setup
+        const player = {
+            x: MAP_COLS / 2 * TILE_SIZE, // Start at center of map
+            y: MAP_ROWS / 2 * TILE_SIZE,
+            width: TILE_SIZE,
+            height: TILE_SIZE,
+            speed: 4, // Pixels per frame
+            image: new Image(),
+            src: 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/ee430770-df2f-493d-8e11-e178794b36a5/d4txxx1-9177727a-412a-4ef8-9b06-92a7f8490ba6.gif', // Player GIF
+        };
+        player.image.src = player.src;
+
+        // Citizens
+        const citizenImages = [
+            'https://media.tenor.com/U-G2j_J2xnAAAAAM/peely-fortnite.gif',
+            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQryE4J4JQLvj1Zhs-4dAaBQPpPjF3pxI6wqg&s',
+            'https://media2.giphy.com/media/LmC8GSARPDatSC6J8X/200w.gif',
+            'https://i.pinimg.com/originals/32/07/b4/3207b463e67dd495c281cd0a8d1f94c3.gif',
+            'https://media.tenor.com/fyvix-HhElcAAAAM/fortnite-dance-fishstick.gif',
+            'https://media.tenor.com/tnvzGKvifOMAAAAM/fortnite-fortnite-dance.gif',
+            // Add more URLs as needed
+        ];
+
+        const citizens = [];
+        const NUM_CITIZENS = 100; // Increased number for a bigger city
+
+        // Initialize Citizens
+        for (let i = 0; i < NUM_CITIZENS; i++) {
+            const citizen = {
+                x: Math.random() * MAP_COLS * TILE_SIZE,
+                y: Math.random() * MAP_ROWS * TILE_SIZE,
+                width: TILE_SIZE,
+                height: TILE_SIZE,
+                speed: 1 + Math.random() * 2,
+                image: new Image(),
+                src: citizenImages[Math.floor(Math.random() * citizenImages.length)],
+                direction: Math.random() * Math.PI * 2
+            };
+            citizen.image.src = citizen.src;
+            citizens.push(citizen);
+        }
+
+        // Generate City Map
+        function generateCity() {
+            for (let row = 0; row < MAP_ROWS; row++) {
+                const mapRow = [];
+                for (let col = 0; col < MAP_COLS; col++) {
+                    // Define roads every 5 tiles
+                    if (row % 5 === 0 || col % 5 === 0) {
+                        mapRow.push('road');
+                    } else {
+                        // Randomly place buildings or grass
+                        const rand = Math.random();
+                        if (rand < 0.05) {
+                            mapRow.push('rock');
+                        } else if (rand < 0.10) {
+                            mapRow.push('water');
+                        } else if (rand < 0.15) {
+                            mapRow.push('shop');
+                        } else {
+                            mapRow.push('grass');
+                        }
+                    }
+                }
+                map.push(mapRow);
+            }
+        }
+
+        let buildings = [];
+
+        // Place Buildings Based on Map
+        function placeBuildings() {
+            for (let row = 0; row < MAP_ROWS; row++) {
+                for (let col = 0; col < MAP_COLS; col++) {
+                    if (map[row][col] === 'shop' || map[row][col] === 'rock' || map[row][col] === 'water') {
+                        const building = {
+                            row: row,
+                            col: col,
+                            x: col * TILE_SIZE,
+                            y: row * TILE_SIZE,
+                            width: TILE_SIZE,
+                            height: TILE_SIZE,
+                            type: map[row][col],
+                            image: assets.buildingTypes[Math.floor(Math.random() * assets.buildingTypes.length)],
+                        };
+                        buildings.push(building);
+                    }
+                }
+            }
+        }
+
+        // Initialize Map and Buildings
+        generateCity();
+        placeBuildings();
+
+        // Handle Player Movement
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // Camera Position
+        let camera = {
+            x: player.x - canvas.width / 2 + player.width / 2,
+            y: player.y - canvas.height / 2 + player.height / 2
+        };
+
+        // Update Camera to Follow Player
+        function updateCamera() {
+            camera.x = player.x - canvas.width / 2 + player.width / 2;
+            camera.y = player.y - canvas.height / 2 + player.height / 2;
+
+            // Clamp camera to map boundaries
+            camera.x = Math.max(0, Math.min(camera.x, MAP_COLS * TILE_SIZE - canvas.width));
+            camera.y = Math.max(0, Math.min(camera.y, MAP_ROWS * TILE_SIZE - canvas.height));
+        }
+
+        // Collision Detection
+        function isColliding(newX, newY) {
+            // Determine the tile player is moving to
+            const tileRow = Math.floor(newY / TILE_SIZE);
+            const tileCol = Math.floor(newX / TILE_SIZE);
+
+            if (tileRow < 0 || tileRow >= MAP_ROWS || tileCol < 0 || tileCol >= MAP_COLS) {
+                return true; // Out of bounds
+            }
+
+            const tile = map[tileRow][tileCol];
+
+            if (tile === 'rock' || tile === 'water' || tile === 'shop') {
+                return true; // Collision with buildings or obstacles
+            }
+
+            return false;
+        }
+
+        // Move Player
+        function movePlayer() {
+            let dx = 0;
+            let dy = 0;
+
+            if (keys['arrowup'] || keys['w']) dy -= player.speed;
+            if (keys['arrowdown'] || keys['s']) dy += player.speed;
+            if (keys['arrowleft'] || keys['a']) dx -= player.speed;
+            if (keys['arrowright'] || keys['d']) dx += player.speed;
+
+            // Calculate new position
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+
+            // Check collision
+            if (!isColliding(newX + player.width / 2, player.y + player.height / 2)) {
+                player.x += dx;
+            }
+            if (!isColliding(player.x + player.width / 2, newY + player.height / 2)) {
+                player.y += dy;
+            }
+        }
+
+        // Move Citizens
+        function moveCitizens() {
+            citizens.forEach(citizen => {
+                citizen.x += Math.cos(citizen.direction) * citizen.speed;
+                citizen.y += Math.sin(citizen.direction) * citizen.speed;
+
+                // Change direction randomly
+                if (Math.random() < 0.01) {
+                    citizen.direction = Math.random() * Math.PI * 2;
+                }
+
+                // Boundary conditions
+                if (citizen.x < 0 || citizen.x > MAP_COLS * TILE_SIZE - TILE_SIZE) {
+                    citizen.direction = Math.PI - citizen.direction;
+                }
+                if (citizen.y < 0 || citizen.y > MAP_ROWS * TILE_SIZE - TILE_SIZE) {
+                    citizen.direction = -citizen.direction;
+                }
+            });
+        }
+
+        // Check Player Interactions with Citizens
+        function checkInteractions() {
+            let interactionShown = false;
+            citizens.forEach(citizen => {
+                const dist = Math.hypot(player.x - citizen.x, player.y - citizen.y);
+                if (dist < TILE_SIZE && !interactionShown) {
+                    dialogueBox.style.display = 'block';
+                    setTimeout(() => {
+                        dialogueBox.style.display = 'none';
+                    }, 2000);
+                    interactionShown = true;
+                }
+            });
+        }
+
+        // Handle Building Clicks
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left + camera.x;
+            const clickY = e.clientY - rect.top + camera.y;
+
+            // Determine which tile was clicked
+            const clickedCol = Math.floor(clickX / TILE_SIZE);
+            const clickedRow = Math.floor(clickY / TILE_SIZE);
+
+            // Check if a building exists at this tile
+            const building = buildings.find(b => b.row === clickedRow && b.col === clickedCol);
+            if (building) {
+                // Navigate to innerds.html with query parameters
+                window.location.href = `innerds.html?row=${building.row}&col=${building.col}`;
+            }
+        });
+
+        // Draw Map
+        function drawMap() {
+            const startCol = Math.floor(camera.x / TILE_SIZE);
+            const endCol = startCol + Math.ceil(canvas.width / TILE_SIZE) + 1;
+            const startRow = Math.floor(camera.y / TILE_SIZE);
+            const endRow = startRow + Math.ceil(canvas.height / TILE_SIZE) + 1;
+
+            for (let row = startRow; row < endRow; row++) {
+                for (let col = startCol; col < endCol; col++) {
+                    if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) continue;
+
+                    const tile = map[row][col];
+                    let img;
+
+                    switch (tile) {
+                        case 'grass':
+                            img = assets.grass;
+                            break;
+                        case 'road':
+                            img = assets.road;
+                            break;
+                        case 'water':
+                            img = assets.water;
+                            break;
+                        case 'rock':
+                            img = assets.rock;
+                            break;
+                        case 'shop':
+                            img = assets.shopKeeper;
+                            break;
+                        default:
+                            img = assets.grass;
+                    }
+
+                    ctx.drawImage(img, col * TILE_SIZE - camera.x, row * TILE_SIZE - camera.y, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+
+        // Draw Buildings
+        function drawBuildings() {
+            buildings.forEach(building => {
+                ctx.drawImage(building.image, building.x - camera.x, building.y - camera.y, TILE_SIZE, TILE_SIZE);
+            });
+        }
+
+        // Draw Citizens
+        function drawCitizens() {
+            citizens.forEach(citizen => {
+                ctx.drawImage(citizen.image, citizen.x - camera.x, citizen.y - camera.y, TILE_SIZE, TILE_SIZE);
+            });
+        }
+
+        // Draw Player
+        function drawPlayer() {
+            ctx.drawImage(player.image, player.x - camera.x, player.y - camera.y, TILE_SIZE, TILE_SIZE);
+        }
+
+        // Render Function
+        function render() {
+            // Clear Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Map
+            drawMap();
+
+            // Draw Buildings
+            drawBuildings();
+
+            // Draw Roads over Buildings if necessary
+            // Example: ctx.drawImage(assets.road, ...);
+
+            // Draw Citizens
+            drawCitizens();
+
+            // Draw Player
+            drawPlayer();
+        }
+
+        // Game Loop
+        function gameLoop() {
+            movePlayer();
+            moveCitizens();
+            checkInteractions();
+            updateCamera();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start Game Once All Assets Are Loaded
+        function assetsLoaded() {
+            // Check if all building images are loaded
+            let loaded = true;
+            assets.buildingTypes.forEach(img => {
+                if (!img.complete) loaded = false;
+            });
+
+            // Check if player image is loaded
+            if (!player.image.complete) loaded = false;
+
+            // Check if all citizen images are loaded
+            for (let citizen of citizens) {
+                if (!citizen.image.complete) {
+                    loaded = false;
+                    break;
+                }
+            }
+
+            return loaded;
+        }
+
+        // Initialize Game
+        function init() {
+            if (assetsLoaded()) {
+                gameLoop();
+            } else {
+                setTimeout(init, 100); // Retry after 100ms
+            }
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galactic Wars</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 3em;
+      color: #00ff00;
+    }
+
+    p {
+      font-size: 1.5em;
+    }
+
+    .back-button, .restart-button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #00ff00;
+      color: #000;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    .back-button:hover, .restart-button:hover {
+      background-color: #fff;
+      color: #00ff00;
+    }
+
+    #gameCanvas {
+      border: 1px solid #fff;
+      display: block;
+      margin: 0 auto;
+    }
+
+    #highscore {
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Galactic Wars</h1>
+  <p>Engage in epic space battles as you fight for control of the galaxy. Command your fleet to victory!</p>
+  
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <p id="score">Score: 0</p>
+  <p id="highscore">High Score: 0</p>
+  
+  <a class="back-button" href="games.html">Back to Games</a>
+  <button class="restart-button" id="restartButton" style="display: none;">Restart</button>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const spaceship = { x: canvas.width / 2, y: canvas.height - 50, width: 50, height: 50, speed: 6 };
+    let bullets = [];
+    let enemies = [];
+    let score = 0;
+    let gameOver = false;
+
+    let rightPressed = false;
+    let leftPressed = false;
+
+    let enemySpeed = 1;
+    const enemySpeedIncrement = 0.01; // Adjust this value to change the rate of increase
+
+    document.addEventListener('keydown', keyDownHandler);
+    document.addEventListener('keyup', keyUpHandler);
+    document.getElementById('restartButton').addEventListener('click', restartGame);
+
+    // Initialize high score
+    let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
+    document.getElementById('highscore').innerText = `High Score: ${highScore}`;
+
+    function keyDownHandler(event) {
+      if (event.key === 'ArrowLeft') {
+        leftPressed = true;
+      } else if (event.key === 'ArrowRight') {
+        rightPressed = true;
+      } else if (event.key === ' ') {
+        shoot();
+      }
+    }
+
+    function keyUpHandler(event) {
+      if (event.key === 'ArrowLeft') {
+        leftPressed = false;
+      } else if (event.key === 'ArrowRight') {
+        rightPressed = false;
+      }
+    }
+
+    function shoot() {
+      bullets.push({ x: spaceship.x + spaceship.width / 2 - 2.5, y: spaceship.y, width: 5, height: 20 });
+    }
+
+    function createEnemy() {
+      const x = Math.random() * (canvas.width - 50);
+      enemies.push({ x: x, y: 0, width: 50, height: 50 });
+    }
+
+    function drawSpaceship() {
+      ctx.fillStyle = '#00ff00';
+      ctx.fillRect(spaceship.x, spaceship.y, spaceship.width, spaceship.height);
+    }
+
+    function drawBullets() {
+      ctx.fillStyle = '#ff0000';
+      bullets.forEach(bullet => {
+        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+      });
+    }
+
+    function drawEnemies() {
+      ctx.fillStyle = '#ffcc00';
+      enemies.forEach(enemy => {
+        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+      });
+    }
+
+    function update() {
+      if (gameOver) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawSpaceship();
+      drawBullets();
+      drawEnemies();
+
+      if (leftPressed && spaceship.x > 0) {
+        spaceship.x -= spaceship.speed;
+      }
+      if (rightPressed && spaceship.x < canvas.width - spaceship.width) {
+        spaceship.x += spaceship.speed;
+      }
+
+      bullets.forEach((bullet, bulletIndex) => {
+        bullet.y -= 5;
+        if (bullet.y < 0) bullets.splice(bulletIndex, 1);
+      });
+
+      enemies.forEach((enemy, enemyIndex) => {
+        enemy.y += enemySpeed; // Move enemies based on current speed
+        if (enemy.y > canvas.height) {
+          gameOver = true;
+        }
+        
+        bullets.forEach((bullet, bulletIndex) => {
+          if (bullet.x < enemy.x + enemy.width &&
+              bullet.x + bullet.width > enemy.x &&
+              bullet.y < enemy.y + enemy.height &&
+              bullet.y + bullet.height > enemy.y) {
+            bullets.splice(bulletIndex, 1);
+            enemies.splice(enemyIndex, 1);
+            score++;
+          }
+        });
+      });
+
+      enemySpeed += enemySpeedIncrement; // Increment enemy speed over time
+
+      document.getElementById('score').innerText = `Score: ${score}`;
+    }
+
+    function gameLoop() {
+      if (Math.random() < 0.02) createEnemy();
+      update();
+      if (!gameOver) requestAnimationFrame(gameLoop);
+      else endGame();
+    }
+
+    function endGame() {
+      // Check and update high score
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('highScore', highScore);
+        document.getElementById('highscore').innerText = `High Score: ${highScore}`;
+      }
+      alert(`Game Over! Your score: ${score}`);
+      document.getElementById('restartButton').style.display = 'inline-block';
+    }
+
+    function restartGame() {
+      // Reset game state
+      spaceship.x = canvas.width / 2;
+      bullets = [];
+      enemies = [];
+      score = 0;
+      gameOver = false;
+      enemySpeed = 1; // Reset enemy speed
+      document.getElementById('restartButton').style.display = 'none';
+      gameLoop();
+    }
+
+    gameLoop();
+  </script>
+
+</body>
+</html>

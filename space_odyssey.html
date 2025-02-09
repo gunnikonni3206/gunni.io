@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Space Odyssey – No Man’s Sky Style with Take Off</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+      /* Prompt shown in space mode when near a planet */
+      #landPrompt {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 20px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-family: sans-serif;
+        font-size: 18px;
+        display: none;
+        z-index: 10;
+      }
+      /* Info displayed in FPS mode */
+      #exitFPS {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-family: sans-serif;
+        font-size: 16px;
+        display: none;
+        z-index: 10;
+      }
+      /* Controls instructions overlay */
+      #instructions {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-family: sans-serif;
+        font-size: 14px;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="landPrompt">Press L to Land</div>
+    <div id="exitFPS">Press ESC to Return to Space, or T to Take Off</div>
+    <div id="instructions"></div>
+
+    <!-- Include Three.js and PointerLockControls (non‑module version) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://threejs.org/examples/js/controls/PointerLockControls.js"></script>
+
+    <script>
+      /* ====================================
+         GLOBAL VARIABLES & SETUP
+      ==================================== */
+      let renderer, scene, camera;
+      let gameMode = "space"; // "space" or "fps"
+      let spaceship, spaceshipVelocity;
+      let planets = [];
+      let keys = {};
+      const clock = new THREE.Clock();
+      let spacePointerLocked = false; // For mouse steering in space mode
+
+      // For FPS mode (planet landing)
+      let fpsControls;
+      let fpsUnlockListener = null; // Saved unlock event handler for FPS mode
+
+      // DOM elements for prompts and instructions
+      const landPrompt = document.getElementById("landPrompt");
+      const exitFPS = document.getElementById("exitFPS");
+      const instructions = document.getElementById("instructions");
+
+      // Initialize renderer, then start in space mode.
+      initRenderer();
+      initSpace();
+      animate();
+
+      /* ====================================
+         RENDERER & EVENT HANDLERS
+      ==================================== */
+      function initRenderer() {
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        window.addEventListener("resize", onWindowResize, false);
+        document.addEventListener("keydown", onKeyDown, false);
+        document.addEventListener("keyup", onKeyUp, false);
+        document.addEventListener("pointerlockchange", onPointerLockChange, false);
+        document.addEventListener("mousemove", onDocumentMouseMove, false);
+      }
+
+      function onWindowResize() {
+        if (camera) {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+        }
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      function onKeyDown(event) {
+        keys[event.key.toLowerCase()] = true;
+        if (gameMode === "space") {
+          // In space mode, if near a planet, press L to land.
+          if (event.key.toLowerCase() === "l") {
+            if (landPrompt.style.display === "block") {
+              const planet = getClosestPlanet();
+              if (planet) {
+                initFPSPlanet(planet);
+              }
+            }
+          }
+        } else if (gameMode === "fps") {
+          // In FPS mode, press T to take off.
+          if (event.key.toLowerCase() === "t") {
+            liftOff();
+          }
+        }
+      }
+
+      function onKeyUp(event) {
+        keys[event.key.toLowerCase()] = false;
+      }
+
+      // For space mode: update pointer lock state.
+      function onPointerLockChange() {
+        if (gameMode === "space") {
+          spacePointerLocked = (document.pointerLockElement === renderer.domElement);
+        }
+      }
+
+      // For space mode: mouse movement steers the spaceship.
+      function onDocumentMouseMove(event) {
+        if (gameMode === "space" && spacePointerLocked) {
+          const sensitivity = 0.002;
+          spaceship.rotation.y -= event.movementX * sensitivity;
+          spaceship.rotation.x -= event.movementY * sensitivity;
+          // Clamp pitch to avoid flipping.
+          const maxPitch = Math.PI / 2;
+          spaceship.rotation.x = Math.max(-maxPitch, Math.min(maxPitch, spaceship.rotation.x));
+        }
+      }
+
+      /* ====================================
+         SPACE MODE – COCKPIT (SHIP) VIEW
+         Accepts an optional starting position.
+      ==================================== */
+      function initSpace(startPos) {
+        gameMode = "space";
+        landPrompt.style.display = "none";
+        exitFPS.style.display = "none";
+
+        // Update the instructions overlay.
+        instructions.innerHTML =
+          "<strong>Space Mode Controls:</strong><br>" +
+          "W: Thrust forward<br>" +
+          "A/D: Strafe left/right<br>" +
+          "Space: Ascend<br>" +
+          "Shift: Descend<br>" +
+          "Mouse: Steer<br>" +
+          "L: Land";
+
+        // Remove any leftover FPS elements.
+        const blocker = document.getElementById("blocker");
+        if (blocker && blocker.parentNode) {
+          blocker.parentNode.removeChild(blocker);
+        }
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000010);
+        addStarField();
+
+        camera = new THREE.PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+        if (startPos) {
+          camera.position.copy(startPos);
+        } else {
+          camera.position.set(0, 2, 5);
+        }
+
+        // Basic lighting.
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Create the spaceship (a green cone).
+        const shipGeometry = new THREE.ConeGeometry(0.3, 1, 32);
+        const shipMaterial = new THREE.MeshStandardMaterial({
+          color: 0x00ff00,
+          metalness: 0.5,
+          roughness: 0.5,
+        });
+        spaceship = new THREE.Mesh(shipGeometry, shipMaterial);
+        spaceship.rotation.x = Math.PI / 2; // Tip points along -Z.
+        if (startPos) {
+          spaceship.position.copy(startPos);
+        } else {
+          spaceship.position.set(0, 0, 0);
+        }
+        scene.add(spaceship);
+        spaceshipVelocity = new THREE.Vector3();
+
+        // Create several random planets.
+        planets = [];
+        const planetCount = 8;
+        for (let i = 0; i < planetCount; i++) {
+          const radius = Math.random() * 2 + 2; // 2 to 4 units.
+          const segments = 64;
+          const planetGeometry = new THREE.SphereGeometry(radius, segments, segments);
+          displaceGeometry(planetGeometry, radius * 0.1);
+          const planetMaterial = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(Math.random(), Math.random(), Math.random()),
+            roughness: 1,
+          });
+          const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+          planet.position.set(
+            (Math.random() - 0.5) * 100,
+            (Math.random() - 0.5) * 100,
+            -Math.random() * 200 - 50
+          );
+          planet.userData.radius = radius;
+          planets.push(planet);
+          scene.add(planet);
+        }
+
+        // In space mode, clicking the canvas requests pointer lock so mouse movement steers the ship.
+        renderer.domElement.addEventListener("click", requestSpacePointerLock, false);
+      }
+
+      function requestSpacePointerLock() {
+        if (gameMode === "space") {
+          renderer.domElement.requestPointerLock();
+        }
+      }
+
+      // A helper function to add a starfield background.
+      function addStarField() {
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 10000;
+        const starVertices = [];
+        for (let i = 0; i < starCount; i++) {
+          starVertices.push(
+            (Math.random() - 0.5) * 1000,
+            (Math.random() - 0.5) * 1000,
+            (Math.random() - 0.5) * 1000
+          );
+        }
+        starGeometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(starVertices, 3)
+        );
+        const starMaterial = new THREE.PointsMaterial({ color: 0xffffff });
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+      }
+
+      // A helper function to perturb geometry vertices for a rough appearance.
+      function displaceGeometry(geometry, magnitude) {
+        const posAttr = geometry.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          const x = posAttr.getX(i);
+          const y = posAttr.getY(i);
+          const z = posAttr.getZ(i);
+          const offset = (Math.sin(x * 5) + Math.cos(y * 5) + Math.sin(z * 5)) / 3;
+          posAttr.setXYZ(i, x + offset * magnitude, y + offset * magnitude, z + offset * magnitude);
+        }
+        geometry.computeVertexNormals();
+      }
+
+      // Returns the planet closest to the spaceship (based on distance to its surface).
+      function getClosestPlanet() {
+        let minDist = Infinity;
+        let closest = null;
+        for (const p of planets) {
+          const dist = spaceship.position.distanceTo(p.position) - p.userData.radius;
+          if (dist < minDist) {
+            minDist = dist;
+            closest = p;
+          }
+        }
+        return closest;
+      }
+
+      /* ====================================
+         FPS MODE – LANDING ON A PLANET
+      ==================================== */
+      function initFPSPlanet(planet) {
+        gameMode = "fps";
+        // Exit pointer lock if active.
+        if (document.pointerLockElement === renderer.domElement) {
+          document.exitPointerLock();
+        }
+        landPrompt.style.display = "none";
+
+        // Update the instructions overlay.
+        instructions.innerHTML =
+          "<strong>FPS Mode Controls:</strong><br>" +
+          "WASD: Move<br>" +
+          "Mouse: Look around<br>" +
+          "T: Take Off<br>" +
+          "ESC: Return to Space";
+
+        // Create a new scene representing the landing area.
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+
+        // Create a large, slightly undulating terrain.
+        const size = 200, segments = 128;
+        const terrainGeometry = new THREE.PlaneGeometry(size, size, segments, segments);
+        terrainGeometry.rotateX(-Math.PI / 2);
+        const posAttr = terrainGeometry.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          const x = posAttr.getX(i);
+          const z = posAttr.getZ(i);
+          const y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 3;
+          posAttr.setY(i, y);
+        }
+        terrainGeometry.computeVertexNormals();
+        const terrainMaterial = new THREE.MeshStandardMaterial({
+          color: planet.material.color,
+          roughness: 1,
+        });
+        const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+        scene.add(terrain);
+
+        // Lighting for FPS mode.
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        sun.position.set(100, 100, 100);
+        scene.add(sun);
+
+        // Setup an FPS camera.
+        camera = new THREE.PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+        camera.position.set(0, 5, 0);
+
+        // Setup PointerLockControls for FPS mode.
+        fpsControls = new THREE.PointerLockControls(camera, renderer.domElement);
+        scene.add(fpsControls.getObject());
+
+        // Create a blocker overlay to instruct the player to click.
+        const blocker = document.createElement("div");
+        blocker.style.position = "absolute";
+        blocker.style.top = "0";
+        blocker.style.left = "0";
+        blocker.style.width = "100%";
+        blocker.style.height = "100%";
+        blocker.style.backgroundColor = "rgba(0,0,0,0.5)";
+        blocker.style.display = "flex";
+        blocker.style.alignItems = "center";
+        blocker.style.justifyContent = "center";
+        blocker.style.color = "#fff";
+        blocker.style.fontSize = "24px";
+        blocker.innerHTML = "Click to start FPS";
+        blocker.id = "blocker";
+        document.body.appendChild(blocker);
+
+        // When pointer lock is acquired, hide the blocker.
+        fpsControls.addEventListener("lock", function () {
+          blocker.style.display = "none";
+        });
+        // Save an unlock event handler so that if the player exits pointer lock, we return to space mode.
+        fpsUnlockListener = function () {
+          blocker.style.display = "flex";
+          blocker.innerHTML = "Click to start FPS";
+          initSpace();
+          if (blocker.parentNode) {
+            blocker.parentNode.removeChild(blocker);
+          }
+        };
+        fpsControls.addEventListener("unlock", fpsUnlockListener);
+
+        blocker.addEventListener("click", function () {
+          fpsControls.lock();
+        });
+      }
+
+      /* ====================================
+         TAKE OFF FROM THE PLANET (in FPS mode)
+      ==================================== */
+      function liftOff() {
+        // Remove the FPS unlock listener and any blocker overlay.
+        if (fpsControls && fpsUnlockListener) {
+          fpsControls.removeEventListener("unlock", fpsUnlockListener);
+        }
+        const blocker = document.getElementById("blocker");
+        if (blocker && blocker.parentNode) {
+          blocker.parentNode.removeChild(blocker);
+        }
+        // Animate a take-off: move the camera upward over 2 seconds.
+        const takeOffHeight = 10; // How high to take off.
+        const takeOffDuration = 2; // Seconds.
+        const startTime = performance.now();
+        const startPos = camera.position.clone();
+
+        function animateTakeOff(now) {
+          const elapsed = (now - startTime) / 1000;
+          const t = Math.min(elapsed / takeOffDuration, 1);
+          camera.position.y = startPos.y + takeOffHeight * t;
+          if (t < 1) {
+            requestAnimationFrame(animateTakeOff);
+          } else {
+            // When done, transition back to space mode with the spaceship at the new position.
+            const newPos = camera.position.clone();
+            initSpace(newPos);
+          }
+        }
+        requestAnimationFrame(animateTakeOff);
+      }
+
+      /* ====================================
+         ANIMATION & CONTROL UPDATES
+      ==================================== */
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+
+        if (gameMode === "space") {
+          updateSpaceship(delta);
+          // In cockpit view the camera matches the spaceship’s position and orientation.
+          camera.position.copy(spaceship.position);
+          camera.quaternion.copy(spaceship.quaternion);
+
+          // If the ship is near a planet (within ~5 units of its surface), show the landing prompt.
+          const closest = getClosestPlanet();
+          if (closest && spaceship.position.distanceTo(closest.position) - closest.userData.radius < 5) {
+            landPrompt.style.display = "block";
+          } else {
+            landPrompt.style.display = "none";
+          }
+        } else if (gameMode === "fps") {
+          updateFPS(delta);
+        }
+        renderer.render(scene, camera);
+      }
+
+      // SPACE MODE: Update spaceship movement using WASD relative to the ship’s current orientation.
+      function updateSpaceship(delta) {
+        const accelSpeed = 10; // Units per second.
+        let acceleration = new THREE.Vector3();
+        // Determine local directions.
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(spaceship.quaternion);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(spaceship.quaternion);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(spaceship.quaternion);
+        if (keys["w"]) acceleration.add(forward);
+        if (keys["s"]) acceleration.add(forward.clone().negate());
+        if (keys["a"]) acceleration.add(right.clone().negate());
+        if (keys["d"]) acceleration.add(right);
+        if (keys[" "]) acceleration.add(up);              // Space key: move up.
+        if (keys["shift"]) acceleration.add(up.clone().negate()); // Shift: move down.
+        if (acceleration.length() > 0) {
+          acceleration.normalize().multiplyScalar(accelSpeed * delta);
+          spaceshipVelocity.add(acceleration);
+        }
+        // Apply damping.
+        spaceshipVelocity.multiplyScalar(0.98);
+        spaceship.position.add(spaceshipVelocity.clone().multiplyScalar(delta));
+      }
+
+      // FPS MODE: Update movement using WASD via the built-in PointerLockControls methods.
+      function updateFPS(delta) {
+        const fpsSpeed = 10;
+        if (fpsControls && fpsControls.isLocked) {
+          let moveX = 0, moveZ = 0;
+          if (keys["w"]) moveZ -= fpsSpeed * delta;
+          if (keys["s"]) moveZ += fpsSpeed * delta;
+          if (keys["a"]) moveX -= fpsSpeed * delta;
+          if (keys["d"]) moveX += fpsSpeed * delta;
+          fpsControls.moveRight(moveX);
+          fpsControls.moveForward(moveZ);
+        }
+      }
+    </script>
+  </body>
+</html>

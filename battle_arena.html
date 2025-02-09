@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Battle Arena – Ultimate Upgrades Demo</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #222;
+      font-family: sans-serif;
+      color: #fff;
+    }
+    #scoreboard, #controls {
+      position: absolute;
+      left: 10px;
+      z-index: 10;
+      font-size: 18px;
+    }
+    #scoreboard {
+      top: 10px;
+    }
+    #controls {
+      top: 40px;
+      font-size: 14px;
+    }
+    canvas {
+      display: block;
+      background: #333;
+      margin: auto;
+    }
+    /* Upgrade overlay styles */
+    #upgradeOverlay {
+      display: none;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      text-align: center;
+      padding-top: 50px;
+    }
+    .card {
+      display: inline-block;
+      width: 250px;
+      margin: 20px;
+      padding: 10px;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      background: #444;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .card:hover {
+      transform: scale(1.05);
+    }
+    .card h3 {
+      margin: 5px 0;
+    }
+    .card p {
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="scoreboard"></div>
+  <div id="controls">
+    <p><strong>Player 1:</strong> Move: W, A, S, D | Aim: F (left), G (right) | Shoot: H | Block: X</p>
+    <p><strong>Player 2:</strong> Move: Arrow keys | Aim: J (left), K (right) | Shoot: L | Block: M</p>
+  </div>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <!-- Upgrade selection overlay -->
+  <div id="upgradeOverlay">
+    <h2>Choose Your Upgrade</h2>
+    <div id="cardContainer"></div>
+  </div>
+  <script>
+    /* ========= BASE CONSTANTS ========= */
+    const BASE_HEALTH = 100;
+    const BASE_SPEED = 3;
+    const BASE_SHOOT_COOLDOWN = 20; // base frames between shots
+    const BASE_BULLET_SPEED = 5;
+    const BASE_BULLET_DAMAGE = 20;
+    const BASE_BULLET_RADIUS = 5;
+    
+    /* ========= DEFAULT PERSISTENT MODIFIERS ========= */
+    const defaultModifiers = {
+      damageMultiplier: 1,
+      bulletCount: 1,
+      reloadOffset: 0,      // extra frames added to reload time
+      speedMultiplier: 1,
+      healthMultiplier: 1,
+      bulletSpeedMultiplier: 1,
+      bulletRadius: BASE_BULLET_RADIUS,
+      bulletBounces: 0,
+      attackSpeedMultiplier: 1, // higher means faster shooting
+      splashDamage: 0,
+      homing: false,
+      drill: false,
+      stun: false,
+      dot: null,             // for continuous DOT effects (if used)
+      lifeSteal: 0,
+      ammo: 10,              // magazine size
+      onBlockEffects: [],    // array of effect flags
+      blockCooldown: 0,
+      // Advanced flags:
+      abyssalCountdown: false,
+      chase: false,
+      chillingPresence: false,
+      dazzle: false,
+      decay: false,
+      demonicPact: false,
+      explosive: false,
+      fastForward: false,
+      grow: false,
+      lifestealer: false,
+      pristine: false,
+      remote: false,
+      sneaky: false,
+      poison: false,
+      buckshot: false,
+      scavenger: false,
+      phoenix: false,
+      radarShot: false,
+      radiance: false,
+      refresh: false,
+      saw: false,
+      shieldCharge: false,
+      shieldsUp: false,
+      shockwave: false,
+      silence: false,
+      spray: false,
+      staticField: false,
+      steadyShot: false,
+      supernova: false,
+      tacticalReload: false,
+      tank: false,
+      targetBounce: false,
+      tasteOfBlood: false,
+      teleport: false,
+      thruster: false,
+      timedDetonation: false,
+      toxicCloud: false,
+      trickster: false,
+      windUp: false
+    };
+    
+    // Each player’s persistent modifiers (start as copies of default)
+    let playerModifiers = {
+      player1: Object.assign({}, defaultModifiers),
+      player2: Object.assign({}, defaultModifiers)
+    };
+    
+    /* ========= GLOBAL VARIABLES ========= */
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreboard = document.getElementById("scoreboard");
+    const upgradeOverlay = document.getElementById("upgradeOverlay");
+    const cardContainer = document.getElementById("cardContainer");
+    
+    let keys = {};
+    let players = [];
+    let projectiles = [];
+    let obstacles = [];
+    let toxicClouds = [];
+    let bombs = [];
+    let scores = { player1: 0, player2: 0 };
+    
+    // Upgrade selection control variables
+    let upgradeSelectionActive = false;
+    let losingPlayerIndex = null;
+    let offeredCards = [];
+    
+    /* ========= UPGRADE CARD POOL ========= */
+    // (This pool includes many of the 67 cards with advanced effects. For brevity, not every single detail is fully simulated.)
+    const cardPool = [
+      {
+        id: 1,
+        name: "Abyssal Countdown",
+        description: "Stand still to summon dark powers.\n(Spams blocks automatically; behaves like Saw with slight pulling in)",
+        rarity: "Rare",
+        effect: function(mod) { mod.abyssalCountdown = true; console.log("Abyssal Countdown enabled."); }
+      },
+      {
+        id: 2,
+        name: "Barrage",
+        description: "Fire many bullets at the same time\n+4 Bullets\n+5 Ammo\n-70% DMG\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) {
+          mod.bulletCount += 4;
+          mod.ammo += 5;
+          mod.damageMultiplier *= 0.3;
+          mod.reloadOffset += 15;
+        }
+      },
+      {
+        id: 3,
+        name: "Big Bullets",
+        description: "Bigger bullets\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.bulletRadius = 10; mod.reloadOffset += 15; }
+      },
+      {
+        id: 4,
+        name: "Bombs Away",
+        description: "Spawn a bunch of small bombs around you when you block\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("BombsAway"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 5,
+        name: "Bouncy",
+        description: "+2 Bullet bounces\n+25% Damage\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.bulletBounces += 2; mod.damageMultiplier *= 1.25; mod.reloadOffset += 15; }
+      },
+      {
+        id: 6,
+        name: "Brawler",
+        description: "+200% HP (3s after dealing DMG, simulated here as +200% HP overall)",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.healthMultiplier *= 3; }
+      },
+      {
+        id: 7,
+        name: "Buckshot",
+        description: "Shotgun-style attack\n+4 Bullets\n+5 Ammo\n-60% DMG\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) {
+          mod.bulletCount += 4;
+          mod.ammo += 5;
+          mod.damageMultiplier *= 0.4;
+          mod.reloadOffset += 15;
+          mod.buckshot = true;
+        }
+      },
+      {
+        id: 8,
+        name: "Burst",
+        description: "Multiple bullets fired in sequence\n+2 Bullets\n+3 Ammo\n-60% DMG\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.bulletCount += 2; mod.ammo += 3; mod.damageMultiplier *= 0.4; mod.reloadOffset += 15; }
+      },
+      {
+        id: 9,
+        name: "Careful Planning",
+        description: "+100% DMG\n-150% ATKSPD\n+0.5s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.damageMultiplier *= 2; mod.attackSpeedMultiplier *= 0.5; mod.reloadOffset += 30; }
+      },
+      {
+        id: 10,
+        name: "Chase",
+        description: "+60% movement when moving towards the opponent\n+30% Health",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.chase = true; mod.healthMultiplier *= 1.3; }
+      },
+      {
+        id: 11,
+        name: "Chilling Presence",
+        description: "Slightly slow nearby enemies\n+25% HP",
+        rarity: "Rare",
+        effect: function(mod) { mod.chillingPresence = true; mod.healthMultiplier *= 1.25; }
+      },
+      {
+        id: 12,
+        name: "Cold Bullets",
+        description: "+70% Bullet slow\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.coldBullets = true; mod.reloadOffset += 15; }
+      },
+      {
+        id: 13,
+        name: "Combine",
+        description: "+100% DMG\n-2 Ammo\n+0.5s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.damageMultiplier *= 2; mod.ammo = Math.max(mod.ammo - 2, 1); mod.reloadOffset += 30; }
+      },
+      {
+        id: 14,
+        name: "Dazzle",
+        description: "Bullets stun the opponent multiple times\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.dazzle = true; mod.reloadOffset += 15; }
+      },
+      {
+        id: 15,
+        name: "Decay",
+        description: "Damage done to you is dealt over 4 seconds\n+50% HP",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.decay = true; mod.healthMultiplier *= 1.5; }
+      },
+      {
+        id: 16,
+        name: "Defender",
+        description: "-30% Block cooldown\n+30% HP",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.blockCooldown = Math.max(mod.blockCooldown - 5, 0); mod.healthMultiplier *= 1.3; }
+      },
+      {
+        id: 17,
+        name: "Demonic Pact",
+        description: "Shooting costs 10HP, removes shooting cooldown\n+9 Bullets\n+2 Splash DMG\n+0.25s Reload time",
+        rarity: "Rare",
+        effect: function(mod) { mod.demonicPact = true; mod.bulletCount += 9; mod.splashDamage += 2; mod.reloadOffset += 15; }
+      },
+      {
+        id: 18,
+        name: "Drill Ammo",
+        description: "+7m Bullets drill through walls\n+0.25s Reload time",
+        rarity: "Rare",
+        effect: function(mod) { mod.drill = true; mod.reloadOffset += 15; }
+      },
+      {
+        id: 19,
+        name: "Echo",
+        description: "Blocking triggers another delayed block\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("Echo"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 20,
+        name: "EMP",
+        description: "Blocking spawns a ring of slowing projectiles\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("EMP"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 21,
+        name: "Empower",
+        description: "Blocking increases the damage and speed of your next shot\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("Empower"); mod.blockCooldown += 15; }
+      },
+      {
+        id: 22,
+        name: "Explosive Bullet",
+        description: "Bullet explodes on impact\n-100% ATKSPD\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.explosive = true; mod.attackSpeedMultiplier *= 0.5; mod.reloadOffset += 15; }
+      },
+      {
+        id: 23,
+        name: "Fastball",
+        description: "+250% Bullet speed\n-50% ATKSPD\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.bulletSpeedMultiplier *= 3.5; mod.attackSpeedMultiplier *= 0.5; mod.reloadOffset += 15; }
+      },
+      {
+        id: 24,
+        name: "Fast Forward",
+        description: "Bullets keep the default trajectory\n+100% Projectile speed\n+30% Reload speed",
+        rarity: "Common",
+        effect: function(mod) { mod.fastForward = true; mod.bulletSpeedMultiplier *= 2; mod.reloadOffset = Math.max(mod.reloadOffset - 10, 0); }
+      },
+      {
+        id: 25,
+        name: "Frost Slam",
+        description: "Slows enemies around you when you block\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Common",
+        effect: function(mod) { mod.onBlockEffects.push("FrostSlam"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 26,
+        name: "Glass Cannon",
+        description: "+100% DMG\n-100% HP\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.damageMultiplier *= 2; mod.healthMultiplier *= 0.5; mod.reloadOffset += 15; }
+      },
+      {
+        id: 27,
+        name: "Grow",
+        description: "Bullets get more damage over time when travelling\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.grow = true; mod.reloadOffset += 15; }
+      },
+      {
+        id: 28,
+        name: "Healing Field",
+        description: "Blocking creates a healing field\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Common",
+        effect: function(mod) { mod.onBlockEffects.push("HealingField"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 29,
+        name: "Homing",
+        description: "Bullets home towards visible targets\n-25% DMG\n-50% ATKSPD\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.homing = true; mod.damageMultiplier *= 0.75; mod.attackSpeedMultiplier *= 0.5; mod.reloadOffset += 15; }
+      },
+      {
+        id: 30,
+        name: "Huge",
+        description: "+80% HP",
+        rarity: "Common",
+        effect: function(mod) { mod.healthMultiplier *= 1.8; }
+      },
+      {
+        id: 31,
+        name: "Implode",
+        description: "Blocking pulls enemies towards you\n+50% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("Implode"); mod.healthMultiplier *= 1.5; mod.blockCooldown += 15; }
+      },
+      {
+        id: 32,
+        name: "Leech",
+        description: "+75% Life steal\n+30% HP",
+        rarity: "Common",
+        effect: function(mod) { mod.lifeSteal += 0.75; mod.healthMultiplier *= 1.3; }
+      },
+      {
+        id: 33,
+        name: "Lifestealer",
+        description: "Steal HP from your opponent when near\n+25% HP",
+        rarity: "Rare",
+        effect: function(mod) { mod.lifestealer = true; mod.healthMultiplier *= 1.25; }
+      },
+      {
+        id: 34,
+        name: "Mayhem",
+        description: "+5 Bullet bounces\n-15% DMG\n+0.5s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.bulletBounces += 5; mod.damageMultiplier *= 0.85; mod.reloadOffset += 30; }
+      },
+      {
+        id: 35,
+        name: "Overpower",
+        description: "Deal 15% of your max HP to enemies around you when you block\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("Overpower"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 36,
+        name: "Parasite",
+        description: "Bullets deal damage over 5 seconds\n+50% Life steal\n+25% HP\n+25% DMG\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.dot = { damageFactor: 0.2, duration: 300 }; mod.lifeSteal += 0.5; mod.healthMultiplier *= 1.25; mod.damageMultiplier *= 1.25; mod.reloadOffset += 15; }
+      },
+      {
+        id: 37,
+        name: "Phoenix",
+        description: "Respawn once on death\n-35% HP",
+        rarity: "Rare",
+        effect: function(mod) { mod.phoenix = true; mod.healthMultiplier *= 0.65; }
+      },
+      {
+        id: 38,
+        name: "Poison",
+        description: "Bullets deal damage over 3 seconds (ticks once per second)\n+70% DMG\n+30% Reload speed\n-1 Bullet",
+        rarity: "Common",
+        effect: function(mod) { 
+          mod.poison = true; 
+          mod.damageMultiplier *= 1.7; 
+          mod.reloadOffset = Math.max(mod.reloadOffset - 10, 0); 
+          mod.bulletCount = Math.max(mod.bulletCount - 1, 1);
+        }
+      },
+      {
+        id: 39,
+        name: "Pristine Perseverence",
+        description: "+400% HP when above 90% HP (conditional effect)",
+        rarity: "Rare",
+        effect: function(mod) { mod.pristine = true; }
+      },
+      {
+        id: 40,
+        name: "Quick Reload",
+        description: "-70% Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.reloadOffset *= 0.3; }
+      },
+      {
+        id: 41,
+        name: "Quick Shot",
+        description: "+150% Bullet speed\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.bulletSpeedMultiplier *= 2.5; mod.reloadOffset += 15; }
+      },
+      {
+        id: 42,
+        name: "Radar Shot",
+        description: "Blocking scans the area for enemies. Automatically shoots any enemy found.\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("RadarShot"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 43,
+        name: "Radiance",
+        description: "Spawn damaging sun waves when reloading. Rate increases during reload.\n+30% HP",
+        rarity: "Rare",
+        effect: function(mod) { mod.radiance = true; mod.healthMultiplier *= 1.3; }
+      },
+      {
+        id: 44,
+        name: "Refresh",
+        description: "You get block back when dealing damage",
+        rarity: "Rare",
+        effect: function(mod) { mod.refresh = true; }
+      },
+      {
+        id: 45,
+        name: "Remote",
+        description: "Steer bullet with right stick/mouse\n-40% Bullet speed\n+0.25s Reload time",
+        rarity: "Rare",
+        effect: function(mod) { mod.remote = true; mod.bulletSpeedMultiplier *= 0.6; mod.reloadOffset += 15; }
+      },
+      {
+        id: 46,
+        name: "Riccochet",
+        description: "Bullets lose half their speed when bouncing\n+2 Bullet bounces\n+25% ATKSPD\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.bulletBounces += 2; mod.attackSpeedMultiplier *= 1.25; mod.reloadOffset += 15; mod.ricochet = true; }
+      },
+      {
+        id: 47,
+        name: "Saw",
+        description: "Blocking spawns a saw around you for a short while\n+30% HP\n+0.25s Block cooldown",
+        rarity: "Rare",
+        effect: function(mod) { mod.onBlockEffects.push("Saw"); mod.healthMultiplier *= 1.3; mod.blockCooldown += 15; }
+      },
+      {
+        id: 48,
+        name: "Scavenger",
+        description: "Dealing damage reloads your weapon\n+0.5s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.scavenger = true; mod.reloadOffset += 30; }
+      },
+      {
+        id: 49,
+        name: "Shield Charge",
+        description: "Blocking launches you forward and grants a second automatic block\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("ShieldCharge"); mod.blockCooldown += 15; }
+      },
+      {
+        id: 50,
+        name: "Shields Up",
+        description: "Firing your last bullet triggers a block (disables continuous reloading)\n+0.5s Reload time\n+0.5s Block cooldown",
+        rarity: "Rare",
+        effect: function(mod) { mod.shieldsUp = true; mod.reloadOffset += 30; mod.blockCooldown += 30; }
+      },
+      {
+        id: 51,
+        name: "Shockwave",
+        description: "Blocking pushes enemies away\n+50% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("Shockwave"); mod.healthMultiplier *= 1.5; mod.blockCooldown += 15; }
+      },
+      {
+        id: 52,
+        name: "Silence",
+        description: "Blocking silences enemies nearby\n+25% HP\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("Silence"); mod.healthMultiplier *= 1.25; mod.blockCooldown += 15; }
+      },
+      {
+        id: 53,
+        name: "Sneaky",
+        description: "Bullets avoid the ground\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.sneaky = true; mod.reloadOffset += 15; }
+      },
+      {
+        id: 54,
+        name: "Spray",
+        description: "+1000% ATKSPD\n+12 Ammo\n-75% DMG\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.attackSpeedMultiplier *= 11; mod.ammo += 12; mod.damageMultiplier *= 0.25; mod.reloadOffset += 15; }
+      },
+      {
+        id: 55,
+        name: "Static Field",
+        description: "Blocking creates a field that slows and deals damage\n+0.25s Block cooldown",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.onBlockEffects.push("StaticField"); mod.blockCooldown += 15; }
+      },
+      {
+        id: 56,
+        name: "Steady Shot",
+        description: "+40% HP\n+100% Bullet speed\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.healthMultiplier *= 1.4; mod.bulletSpeedMultiplier *= 2; mod.reloadOffset += 15; }
+      },
+      {
+        id: 57,
+        name: "Supernova",
+        description: "Spawns a field that pulls enemies in and stuns after a while\n+50% HP\n+0.5s Block cooldown",
+        rarity: "Rare",
+        effect: function(mod) { mod.onBlockEffects.push("Supernova"); mod.healthMultiplier *= 1.5; mod.blockCooldown += 30; }
+      },
+      {
+        id: 58,
+        name: "Tactical Reload",
+        description: "Blocking reloads your weapon\n+0.25s Block cooldown",
+        rarity: "Rare",
+        effect: function(mod) { mod.onBlockEffects.push("TacticalReload"); mod.blockCooldown += 15; }
+      },
+      {
+        id: 59,
+        name: "Tank",
+        description: "+100% HP\n-25% ATKSPD\n+0.5s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.healthMultiplier *= 2; mod.attackSpeedMultiplier *= 0.75; mod.reloadOffset += 30; }
+      },
+      {
+        id: 60,
+        name: "Target Bounce",
+        description: "+1 Bullet bounce\n-20% DMG\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.bulletBounces += 1; mod.damageMultiplier *= 0.8; mod.reloadOffset += 15; }
+      },
+      {
+        id: 61,
+        name: "Taste of Blood",
+        description: "+50% movement speed 3s after dealing DMG\n+30% Life steal",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.tasteOfBlood = true; mod.lifeSteal += 0.3; mod.speedMultiplier *= 1.5; }
+      },
+      {
+        id: 62,
+        name: "Teleport",
+        description: "Blocking teleports you forward\n-30% Block cooldown",
+        rarity: "Rare",
+        effect: function(mod) { mod.onBlockEffects.push("Teleport"); mod.blockCooldown = Math.max(mod.blockCooldown - 15, 0); }
+      },
+      {
+        id: 63,
+        name: "Thruster",
+        description: "Bullets have thrusters that push targets\n+0.25s Reload time",
+        rarity: "Uncommon",
+        effect: function(mod) { mod.thruster = true; mod.reloadOffset += 15; }
+      },
+      {
+        id: 64,
+        name: "Timed Detonation",
+        description: "Bullets spawn bombs that explode after 0.5s\n-15% DMG\n+0.25s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.timedDetonation = true; mod.damageMultiplier *= 0.85; mod.reloadOffset += 15; }
+      },
+      {
+        id: 65,
+        name: "Toxic Cloud",
+        description: "Bullets spawn a poison cloud on impact.\nClouds deal damage and slow.\n-20% ATKSPD\n+0.5s Reload time",
+        rarity: "Rare",
+        effect: function(mod) { mod.toxicCloud = true; mod.attackSpeedMultiplier *= 0.8; mod.reloadOffset += 30; }
+      },
+      {
+        id: 66,
+        name: "Trickster",
+        description: "Bullets deal 80% more DMG per bounce\n+2 Bullet bounces\n-20% DMG\n+0.5s Reload time",
+        rarity: "Rare",
+        effect: function(mod) { mod.trickster = true; mod.bulletBounces += 2; mod.damageMultiplier *= 0.8; mod.reloadOffset += 30; }
+      },
+      {
+        id: 67,
+        name: "Wind Up",
+        description: "+100% Bullet speed\n+60% DMG\n-100% ATKSPD\n+0.5s Reload time",
+        rarity: "Common",
+        effect: function(mod) { mod.bulletSpeedMultiplier *= 2; mod.damageMultiplier *= 1.6; mod.attackSpeedMultiplier *= 0.1; mod.reloadOffset += 30; }
+      }
+    ];
+    
+    /* ========= UTILITY FUNCTIONS ========= */
+    // Return n random unique cards.
+    function getRandomCards(n) {
+      let shuffled = cardPool.slice().sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, n);
+    }
+    // Euclidean distance.
+    function distance(x1, y1, x2, y2) {
+      return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    }
+    
+    /* ========= ADVANCED EFFECTS CLASSES ========= */
+    class ToxicCloud {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 30;
+        this.duration = 180; // 3 seconds at 60fps
+        this.damagePerTick = 0.5; // damage applied each tick
+        this.tickInterval = 60;   // ticks every 60 frames (1 second)
+        this.tickTimer = 60;
+      }
+      update() {
+        this.tickTimer--;
+        if (this.tickTimer <= 0) {
+          // Damage all players inside
+          for (let p of players) {
+            if (distance(this.x, this.y, p.x, p.y) < this.radius + p.radius) {
+              p.health -= this.damagePerTick;
+            }
+          }
+          this.tickTimer = this.tickInterval;
+        }
+        this.duration--;
+      }
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = "rgba(0,255,0,0.3)";
+        ctx.fill();
+      }
+    }
+    
+    class Bomb {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 10;
+        this.timer = 30; // 0.5 second
+      }
+      update() {
+        this.timer--;
+        if(this.timer <= 0) {
+          // Explode: deal area damage to any player within 50px.
+          for(let p of players) {
+            if(distance(this.x, this.y, p.x, p.y) < 50) {
+              p.health -= 30;
+            }
+          }
+          this.timer = -1;
+        }
+      }
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = "orange";
+        ctx.fill();
+      }
+    }
+    
+    /* ========= PLAYER CLASS ========= */
+    class Player {
+      constructor(x, y, color, controls, modifiers) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.controls = controls; // { up, down, left, right, aimLeft, aimRight, shoot, block }
+        this.modifiers = modifiers;
+        this.radius = 20;
+        this.speed = BASE_SPEED * modifiers.speedMultiplier;
+        this.maxHealth = BASE_HEALTH * modifiers.healthMultiplier;
+        this.health = this.maxHealth;
+        this.angle = Math.PI/2;
+        this.ammo = modifiers.ammo;
+        this.maxAmmo = modifiers.ammo;
+        this.shootCooldown = 0;
+        this.isBlocking = false;
+        this.blockTimer = 0;
+        this.blockCooldownTimer = 0;
+        this.dotEffects = [];
+        this.stunTimer = 0;
+        this.hasRespawned = false;
+      }
+      
+      update() {
+        // If stunned, skip actions.
+        if(this.stunTimer > 0) { this.stunTimer--; return; }
+        let prevX = this.x, prevY = this.y;
+        // Movement
+        if (keys[this.controls.up] && this.y - this.radius > 0) this.y -= this.speed;
+        if (keys[this.controls.down] && this.y + this.radius < canvas.height) this.y += this.speed;
+        if (keys[this.controls.left] && this.x - this.radius > 0) this.x -= this.speed;
+        if (keys[this.controls.right] && this.x + this.radius < canvas.width) this.x += this.speed;
+        
+        // Abyssal Countdown: auto-block if standing still.
+        if(this.modifiers.abyssalCountdown && Math.abs(this.x - prevX) < 0.1 && Math.abs(this.y - prevY) < 0.1) {
+          if(Math.random() < 0.02) { this.isBlocking = true; this.blockTimer = 30; }
+        }
+        
+        // Aiming
+        if (keys[this.controls.aimLeft]) this.angle -= 0.1;
+        if (keys[this.controls.aimRight]) this.angle += 0.1;
+        
+        // Shooting
+        if (keys[this.controls.shoot] && this.shootCooldown <= 0 && this.ammo > 0) { this.shoot(); }
+        if (this.ammo <= 0 && this.shootCooldown <= 0) { this.ammo = this.maxAmmo; }
+        if (this.shootCooldown > 0) this.shootCooldown--;
+        
+        // Blocking
+        if (keys[this.controls.block] && this.blockCooldownTimer <= 0 && !this.isBlocking) {
+          this.isBlocking = true;
+          this.blockTimer = 30;
+          this.blockCooldownTimer = 60 + this.modifiers.blockCooldown;
+        }
+        if (this.isBlocking) { this.blockTimer--; if(this.blockTimer <= 0) this.isBlocking = false; }
+        if (this.blockCooldownTimer > 0) this.blockCooldownTimer--;
+        
+        // Process DOT effects (including our new tick-based poison)
+        for (let i = this.dotEffects.length - 1; i >= 0; i--) {
+          let eff = this.dotEffects[i];
+          if(eff.tickInterval !== undefined) {  // tick-based effect
+            eff.tickTimer--;
+            if(eff.tickTimer <= 0 && eff.ticksRemaining > 0) {
+              this.health -= eff.damagePerTick;
+              eff.ticksRemaining--;
+              eff.tickTimer = eff.tickInterval;
+            }
+            if(eff.ticksRemaining <= 0) this.dotEffects.splice(i,1);
+          } else {
+            // Continuous effect
+            this.health -= eff.damagePerFrame;
+            eff.duration--;
+            if(eff.duration <= 0) this.dotEffects.splice(i,1);
+          }
+        }
+        
+        // Phoenix effect: respawn once if dead.
+        if(this.health <= 0 && this.modifiers.phoenix && !this.hasRespawned) {
+          this.health = this.maxHealth;
+          this.hasRespawned = true;
+          console.log("Phoenix effect: Player respawned!");
+        }
+      }
+      
+      shoot() {
+        if(this.modifiers.demonicPact) { this.health -= 10; this.shootCooldown = 0; }
+        let count = this.modifiers.bulletCount;
+        let spread = (this.modifiers.buckshot) ? 0.5 : 0.2;
+        if(count === 1) {
+          let tipX = this.x + Math.cos(this.angle)*(this.radius+5);
+          let tipY = this.y + Math.sin(this.angle)*(this.radius+5);
+          projectiles.push(new Projectile(tipX, tipY, this.angle, this));
+        } else {
+          let startAngle = this.angle - spread/2;
+          let angleStep = spread/(count-1);
+          for (let i = 0; i < count; i++) {
+            let bulletAngle = startAngle + i * angleStep;
+            let tipX = this.x + Math.cos(bulletAngle)*(this.radius+5);
+            let tipY = this.y + Math.sin(bulletAngle)*(this.radius+5);
+            projectiles.push(new Projectile(tipX, tipY, bulletAngle, this));
+          }
+        }
+        this.ammo--;
+        this.shootCooldown = Math.floor((BASE_SHOOT_COOLDOWN + this.modifiers.reloadOffset) / this.modifiers.attackSpeedMultiplier);
+      }
+      
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        let tLength = this.radius + 10;
+        ctx.lineTo(this.x + Math.cos(this.angle)*tLength, this.y + Math.sin(this.angle)*tLength);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        // Health bar
+        let barW = 40, barH = 6;
+        ctx.fillStyle = "red";
+        ctx.fillRect(this.x - barW/2, this.y - this.radius - 15, barW, barH);
+        ctx.fillStyle = "green";
+        let healthW = (this.health/this.maxHealth) * barW;
+        ctx.fillRect(this.x - barW/2, this.y - this.radius - 15, healthW, barH);
+        // Ammo count
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Ammo: " + this.ammo, this.x, this.y + this.radius + 15);
+        // If blocking, draw an outline
+        if(this.isBlocking) {
+          ctx.strokeStyle = "#0ff";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius+5, 0, Math.PI*2);
+          ctx.stroke();
+        }
+      }
+    }
+    
+    /* ========= PROJECTILE CLASS ========= */
+    class Projectile {
+      constructor(x, y, angle, shooter) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.shooter = shooter;
+        this.speed = BASE_BULLET_SPEED * shooter.modifiers.bulletSpeedMultiplier;
+        this.dx = Math.cos(angle)*this.speed;
+        this.dy = Math.sin(angle)*this.speed;
+        this.damage = BASE_BULLET_DAMAGE * shooter.modifiers.damageMultiplier;
+        this.radius = shooter.modifiers.bulletRadius;
+        this.life = 100;
+        this.remainingBounces = shooter.modifiers.bulletBounces;
+      }
+      
+      update() {
+        if(this.shooter.modifiers.grow) { this.damage += 0.1; }
+        if(this.shooter.modifiers.homing) {
+          let target = null, minDist = Infinity;
+          for(let p of players) {
+            if(p === this.shooter) continue;
+            let d = distance(this.x, this.y, p.x, p.y);
+            if(d < minDist){ minDist = d; target = p; }
+          }
+          if(target) {
+            let desired = Math.atan2(target.y - this.y, target.x - this.x);
+            let diff = desired - this.angle;
+            this.angle += diff * 0.05;
+            this.dx = Math.cos(this.angle)*this.speed;
+            this.dy = Math.sin(this.angle)*this.speed;
+          }
+        }
+        this.x += this.dx;
+        this.y += this.dy;
+        this.life--;
+      }
+      
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+      }
+    }
+    
+    /* ========= OBSTACLE CLASS ========= */
+    class Obstacle {
+      constructor(x, y, w, h) { this.x = x; this.y = y; this.w = w; this.h = h; }
+      draw(ctx) { ctx.fillStyle = "#888"; ctx.fillRect(this.x, this.y, this.w, this.h); }
+    }
+    
+    /* ========= UPGRADE SELECTION FUNCTIONS ========= */
+    function showUpgradeSelection() {
+      offeredCards = getRandomCards(3);
+      cardContainer.innerHTML = "";
+      offeredCards.forEach(card => {
+        let cardDiv = document.createElement("div");
+        cardDiv.className = "card";
+        cardDiv.innerHTML = `<h3>${card.name}</h3>
+                             <p>${card.description}</p>
+                             <p><strong>Rarity:</strong> ${card.rarity}</p>`;
+        cardDiv.addEventListener("click", () => {
+          applyCardEffect(losingPlayerIndex, card);
+          hideUpgradeOverlay();
+          resetRound();
+        });
+        cardContainer.appendChild(cardDiv);
+      });
+      upgradeOverlay.style.display = "block";
+    }
+    function hideUpgradeOverlay() {
+      upgradeOverlay.style.display = "none";
+      upgradeSelectionActive = false;
+      losingPlayerIndex = null;
+    }
+    function applyCardEffect(loserIndex, card) {
+      let mod = (loserIndex === 0) ? playerModifiers.player1 : playerModifiers.player2;
+      card.effect(mod);
+      console.log(`Applied ${card.name} to Player ${loserIndex+1}`);
+    }
+    
+    /* ========= COLLISION DETECTION ========= */
+    function checkCollisions() {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        let proj = projectiles[i];
+        if(proj.x < 0 || proj.x > canvas.width || proj.y < 0 || proj.y > canvas.height || proj.life <= 0) {
+          projectiles.splice(i,1);
+          continue;
+        }
+        let hitObstacle = false;
+        for (let obs of obstacles) {
+          if(proj.x > obs.x && proj.x < obs.x+obs.w &&
+             proj.y > obs.y && proj.y < obs.y+obs.h) {
+            if(!proj.shooter.modifiers.drill) {
+              if(proj.remainingBounces > 0) {
+                proj.remainingBounces--;
+                if(proj.x < obs.x || proj.x > obs.x+obs.w) proj.dx = -proj.dx;
+                else proj.dy = -proj.dy;
+                continue;
+              } else {
+                hitObstacle = true;
+                break;
+              }
+            }
+          }
+        }
+        if(hitObstacle) { 
+          if(proj.shooter.modifiers.toxicCloud) { toxicClouds.push(new ToxicCloud(proj.x, proj.y)); }
+          if(proj.shooter.modifiers.timedDetonation) { bombs.push(new Bomb(proj.x, proj.y)); }
+          projectiles.splice(i,1);
+          continue;
+        }
+        for (let p of players) {
+          if(p === proj.shooter) continue;
+          if(distance(proj.x, proj.y, p.x, p.y) < p.radius + proj.radius) {
+            if(p.isBlocking) {
+              triggerBlockEffects(p);
+              projectiles.splice(i,1);
+              break;
+            } else {
+              p.health -= proj.damage;
+              if(proj.shooter.modifiers.lifeSteal > 0) {
+                proj.shooter.health += proj.damage * proj.shooter.modifiers.lifeSteal;
+                if(proj.shooter.health > proj.shooter.maxHealth) proj.shooter.health = proj.shooter.maxHealth;
+              }
+              if(proj.shooter.modifiers.explosive) {
+                for(let other of players) {
+                  if(other === proj.shooter) continue;
+                  if(distance(proj.x, proj.y, other.x, other.y) < 50)
+                    other.health -= proj.damage * 0.5;
+                }
+              }
+              // Apply poison DOT as tick-based: one tick per second for 3 seconds.
+              if(proj.shooter.modifiers.poison) {
+                p.dotEffects.push({ tickInterval: 60, tickTimer: 60, ticksRemaining: 3, damagePerTick: proj.damage * 0.1 });
+              }
+              if(proj.shooter.modifiers.thruster) {
+                let angle = Math.atan2(p.y - proj.y, p.x - proj.x);
+                p.x += Math.cos(angle) * 10;
+                p.y += Math.sin(angle) * 10;
+              }
+              if(proj.shooter.modifiers.toxicCloud) {
+                toxicClouds.push(new ToxicCloud(proj.x, proj.y));
+              }
+              if(proj.shooter.modifiers.timedDetonation) {
+                bombs.push(new Bomb(proj.x, proj.y));
+              }
+              projectiles.splice(i,1);
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    function triggerBlockEffects(player) {
+      if(player.modifiers.onBlockEffects.length > 0) {
+        player.modifiers.onBlockEffects.forEach(effect => {
+          console.log(`Player ${players.indexOf(player)+1} triggers on-block effect: ${effect}`);
+          // Additional on-block effect logic can be implemented here.
+        });
+      }
+    }
+    
+    /* ========= GAME INITIALIZATION ========= */
+    function initGame() {
+      players = [];
+      // Player 1 controls remain the same.
+      players.push(new Player(100, canvas.height/2, "#3498db", {
+        up: "w", down: "s", left: "a", right: "d",
+        aimLeft: "f", aimRight: "g", shoot: "h", block: "x"
+      }, playerModifiers.player1));
+      // Player 2: movement via arrow keys, aim with J (left) and K (right), shoot with L, block with M.
+      players.push(new Player(canvas.width - 100, canvas.height/2, "#e74c3c", {
+        up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight",
+        aimLeft: "j", aimRight: "k", shoot: "l", block: "m"
+      }, playerModifiers.player2));
+      projectiles = [];
+      obstacles = [];
+      toxicClouds = [];
+      bombs = [];
+      obstacles.push(new Obstacle(canvas.width/2 - 50, canvas.height/2 - 100, 100, 200));
+      obstacles.push(new Obstacle(canvas.width/4 - 30, canvas.height/4 - 30, 60, 60));
+      obstacles.push(new Obstacle(canvas.width*3/4 - 30, canvas.height*3/4 - 30, 60, 60));
+    }
+    
+    /* ========= INPUT HANDLING ========= */
+    window.addEventListener("keydown", e => { keys[e.key] = true; });
+    window.addEventListener("keyup", e => { keys[e.key] = false; });
+    
+    /* ========= GAME LOOP ========= */
+    function update() {
+      if(upgradeSelectionActive) return;
+      
+      players.forEach(p => p.update());
+      projectiles.forEach(p => p.update());
+      toxicClouds.forEach(tc => tc.update());
+      bombs.forEach(b => b.update());
+      toxicClouds = toxicClouds.filter(tc => tc.duration > 0);
+      bombs = bombs.filter(b => b.timer > 0);
+      
+      checkCollisions();
+      
+      players.forEach((p, idx) => {
+        if(p.health <= 0 && !upgradeSelectionActive) {
+          if(idx === 0) scores.player2++; else scores.player1++;
+          upgradeSelectionActive = true;
+          losingPlayerIndex = idx;
+          showUpgradeSelection();
+        }
+      });
+    }
+    
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      obstacles.forEach(obs => obs.draw(ctx));
+      toxicClouds.forEach(tc => tc.draw(ctx));
+      bombs.forEach(b => b.draw(ctx));
+      players.forEach(p => p.draw(ctx));
+      projectiles.forEach(p => p.draw(ctx));
+      
+      if(upgradeSelectionActive) {
+        ctx.fillStyle = "#fff";
+        ctx.font = "40px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Round Over!", canvas.width/2, canvas.height/2);
+      }
+    }
+    
+    function updateScoreboard() {
+      scoreboard.innerHTML = `Player 1 (Blue): ${scores.player1} &nbsp;&nbsp;&nbsp; Player 2 (Red): ${scores.player2}`;
+    }
+    
+    function gameLoop() {
+      update();
+      draw();
+      updateScoreboard();
+      requestAnimationFrame(gameLoop);
+    }
+    
+    function resetRound() { initGame(); }
+    
+    /* ========= START GAME ========= */
+    initGame();
+    gameLoop();
+  </script>
+</body>
+</html>

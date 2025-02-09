@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Invaders</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 0;
+      margin: 0;
+    }
+
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #00ff00;
+    }
+
+    h1 {
+      font-size: 3em;
+      color: #00ff00;
+    }
+
+    p {
+      font-size: 1.5em;
+    }
+
+    .back-button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #00ff00;
+      color: #000;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    .back-button:hover {
+      background-color: #fff;
+      color: #00ff00;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #healthBar {
+      width: 100px;
+      height: 10px;
+      background: red;
+      margin: 10px auto;
+      position: relative;
+    }
+
+    #health {
+      height: 100%;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Space Invaders</h1>
+  <div id="healthBar">
+    <div id="health"></div>
+  </div>
+  <p id="message" class="hidden"></p>
+  
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <a class="back-button" href="games.html">Back to Games</a>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Player settings
+    const playerWidth = 40;
+    const playerHeight = 20;
+    let playerX = (canvas.width - playerWidth) / 2;
+    const playerY = canvas.height - playerHeight - 10;
+    let leftPressed = false;
+    let rightPressed = false;
+    let playerHealth = 3;
+    let playerUpgrades = {
+      speed: 0,
+      doubleShot: false,
+      tripleShot: false,
+      rapidFire: 0,
+      piercing: false,
+      diagonalShot: false,
+      biggerBullets: false,
+      fasterBullets: false,
+      healthUpgrade: 0,
+      miniDrones: 0,
+    };
+    
+    let rapidFireActive = false;
+    let shieldActive = false;
+    let scoreMultiplier = 1;
+    let healthPackActive = false;
+
+    // Bullet settings
+    const bulletWidth = 5;
+    const bulletHeight = 10;
+    let bullets = [];
+    let enemyBullets = [];
+    let drones = [];
+
+    // Alien settings
+    const alienWidth = 40;
+    const alienHeight = 20;
+    const alienRowCount = 5;
+    let alienColumnCount = 7;
+    let aliens = [];
+    let alienSpeed = 1;
+    let direction = 1;
+    let waveCount = 0;
+    const totalWaves = 20;
+    let gameOver = false;
+    let score = 0;
+
+    // Shield settings
+    const shieldWidth = 60;
+    const shieldHeight = 10;
+    const shields = [
+      { x: 150, y: 480 },
+      { x: 320, y: 480 },
+      { x: 490, y: 480 }
+    ];
+
+    // Upgrade settings
+    const upgrades = [];
+    const upgradeTypes = [
+      { name: "Speed", effect: "speed", amount: 1 }, // Increase player speed
+      { name: "Double Shot", effect: "doubleShot" }, // Double bullets
+      { name: "Triple Shot", effect: "tripleShot" }, // Triple bullets
+      { name: "Rapid Fire", effect: "rapidFire", amount: 1 }, // Increase firing rate
+      { name: "Health", effect: "health", amount: 1 }, // Increase health
+      { name: "Piercing Bullets", effect: "piercing" }, // Piercing bullets
+      { name: "Diagonal Shot", effect: "diagonalShot" }, // Diagonal shooting
+      { name: "Faster Bullets", effect: "fasterBullets" }, // Faster bullets
+      { name: "Bigger Bullets", effect: "biggerBullets" }, // Bigger bullets
+      { name: "Homing Missiles", effect: "homing" }, // Bullets home in on enemies
+      { name: "Nuke", effect: "nuke" }, // Clears all enemies
+      { name: "Score Multiplier", effect: "scoreMultiplier" }, // Doubles points
+      { name: "Shield", effect: "shield" }, // Temporary invulnerability
+      { name: "Time Freeze", effect: "timeFreeze" }, // Stops enemy movement
+      { name: "Mini Drones", effect: "miniDrones" }, // Spawn two drones
+    ];
+
+    // Initialize aliens
+    function initAliens() {
+      aliens = [];
+      for (let c = 0; c < alienColumnCount + waveCount; c++) {
+        aliens[c] = [];
+        for (let r = 0; r < alienRowCount; r++) {
+          const randomType = Math.floor(Math.random() * 10); // Random enemy type
+          let alien = {
+            x: c * (alienWidth + 10),
+            y: r * (alienHeight + 10),
+            alive: true,
+            type: randomType,
+            color: "#00ffff", // Default color
+          };
+          switch (randomType) {
+            case 0:
+              alien.color = "#00ffff"; // Squid
+              break;
+            case 1:
+              alien.color = "#ff00ff"; // Octopus
+              break;
+            case 2:
+              alien.color = "#ff0000"; // Crab
+              break;
+            case 3:
+              alien.color = "#ffff00"; // Glider
+              break;
+            case 4:
+              alien.color = "#00ff00"; // Spawner
+              break;
+            case 5:
+              alien.color = "#ff8800"; // Shieldbug
+              break;
+            case 6:
+              alien.color = "#0000ff"; // Jumper
+              break;
+            case 7:
+              alien.color = "#800080"; // Mothership
+              break;
+            case 8:
+              alien.color = "#808080"; // Sentinel
+              break;
+            case 9:
+              alien.color = "#c0c0c0"; // Time-Warp
+              break;
+          }
+          aliens[c][r] = alien;
+        }
+      }
+    }
+
+    // Draw player
+    function drawPlayer() {
+      ctx.fillStyle = "#00ff00";
+      ctx.fillRect(playerX, playerY, playerWidth, playerHeight);
+    }
+
+    // Draw shields
+    function drawShields() {
+      ctx.fillStyle = "#ffff00";
+      shields.forEach(shield => {
+        ctx.fillRect(shield.x, shield.y, shieldWidth, shieldHeight);
+      });
+    }
+
+    // Draw bullets
+    function drawBullets() {
+      bullets.forEach(bullet => {
+        ctx.fillStyle = bullet.piercing ? "#ff6600" : "#ff0000"; // Color change for piercing bullets
+        ctx.fillRect(bullet.x, bullet.y, bulletWidth, bulletHeight);
+      });
+    }
+
+    // Draw enemy bullets
+    function drawEnemyBullets() {
+      ctx.fillStyle = "#ffffff";
+      enemyBullets.forEach(bullet => {
+        ctx.fillRect(bullet.x, bullet.y, bulletWidth, bulletHeight);
+      });
+    }
+
+    // Draw aliens
+    function drawAliens() {
+      aliens.forEach(column => {
+        column.forEach(alien => {
+          if (alien.alive) {
+            ctx.fillStyle = alien.color;
+            ctx.fillRect(alien.x, alien.y, alienWidth, alienHeight);
+          }
+        });
+      });
+    }
+
+    // Draw upgrades
+    function drawUpgrades() {
+      upgrades.forEach(upgrade => {
+        ctx.fillStyle = "#ff00ff";
+        ctx.fillRect(upgrade.x, upgrade.y, bulletWidth, bulletHeight);
+      });
+    }
+
+    // Draw health bar
+    function drawHealthBar() {
+      const healthBar = document.getElementById("health");
+      healthBar.style.width = `${(playerHealth / 3) * 100}%`;
+    }
+
+    // Draw message
+    function drawMessage() {
+      const message = document.getElementById("message");
+      message.classList.remove("hidden");
+      message.innerText = `Game Over! Your score: ${score}`;
+    }
+
+    // Update game state
+    function update() {
+      bullets = bullets.filter(bullet => bullet.y > 0);
+      enemyBullets = enemyBullets.filter(bullet => bullet.y < canvas.height);
+      upgrades.forEach(upgrade => {
+        upgrade.y += 2; // Move upgrades down
+      });
+
+      bullets.forEach(bullet => {
+        bullet.y -= 3; // Bullet speed
+      });
+
+      enemyBullets.forEach(bullet => {
+        bullet.y += 2; // Enemy bullet speed
+      });
+
+      // Move aliens
+      let hitBottom = false;
+      aliens.forEach(column => {
+        column.forEach(alien => {
+          if (alien.alive) {
+            alien.x += alienSpeed * direction;
+            if (alien.x + alienWidth > canvas.width || alien.x < 0) {
+              hitBottom = true;
+            }
+          }
+        });
+      });
+
+      if (hitBottom) {
+        direction = -direction;
+        aliens.forEach(column => {
+          column.forEach(alien => {
+            alien.y += 10; // Move down
+          });
+        });
+      }
+
+      // Check for bullet collisions
+      bullets.forEach(bullet => {
+        aliens.forEach(column => {
+          column.forEach(alien => {
+            if (alien.alive &&
+              bullet.x < alien.x + alienWidth &&
+              bullet.x + bulletWidth > alien.x &&
+              bullet.y < alien.y + alienHeight &&
+              bullet.y + bulletHeight > alien.y) {
+              alien.alive = false;
+              bullet.y = -10; // Remove bullet
+              score += 10 * scoreMultiplier; // Increase score
+              // Chance to drop upgrade
+              if (Math.random() < 0.5) { // 50% chance to drop an upgrade
+                const upgrade = {
+                  x: alien.x,
+                  y: alien.y,
+                  type: Math.floor(Math.random() * upgradeTypes.length)
+                };
+                upgrades.push(upgrade);
+              }
+            }
+          });
+        });
+      });
+
+      // Check for enemy shooting
+      aliens.forEach(column => {
+        const frontRow = column.filter(alien => alien.alive);
+        if (frontRow.length > 0) {
+          frontRow.forEach(alien => {
+            if (Math.random() < 0.01) { // Adjusted to make shooting more rare
+              enemyBullets.push({ x: alien.x + alienWidth / 2 - bulletWidth / 2, y: alien.y + alienHeight, piercesShield: alien.piercesShield });
+            }
+          });
+        }
+      });
+
+      // Check for enemy bullet collisions with player
+      enemyBullets.forEach(bullet => {
+        if (bullet.y + bulletHeight > playerY &&
+            bullet.x + bulletWidth > playerX &&
+            bullet.x < playerX + playerWidth) {
+          if (!shieldActive) {
+            playerHealth--;
+          }
+          bullet.y = canvas.height + 10; // Remove bullet
+          if (playerHealth <= 0) {
+            gameOver = true; // Player dies
+          }
+        }
+
+        // Check for enemy bullet collisions with shields
+        if (!bullet.piercesShield) {
+          shields.forEach(shield => {
+            if (bullet.y + bulletHeight > shield.y &&
+                bullet.x + bulletWidth > shield.x &&
+                bullet.x < shield.x + shieldWidth) {
+              bullet.y = canvas.height + 10; // Remove bullet
+            }
+          });
+        }
+      });
+
+      // Check for upgrades collection
+      upgrades.forEach((upgrade, index) => {
+        if (upgrade.y + bulletHeight > playerY &&
+            upgrade.x + bulletWidth > playerX &&
+            upgrade.x < playerX + playerWidth) {
+          const upgradeType = upgradeTypes[upgrade.type];
+          if (upgradeType.effect === "health") {
+            playerHealth += upgradeType.amount; // Restore health
+          } else {
+            if (upgradeType.effect === "speed") {
+              playerUpgrades.speed++;
+            } else if (upgradeType.effect === "doubleShot") {
+              playerUpgrades.doubleShot = true;
+            } else if (upgradeType.effect === "tripleShot") {
+              playerUpgrades.tripleShot = true;
+            } else if (upgradeType.effect === "rapidFire") {
+              rapidFireActive = true;
+              setTimeout(() => {
+                rapidFireActive = false;
+              }, 10000); // 10 seconds
+            } else if (upgradeType.effect === "piercing") {
+              playerUpgrades.piercing = true;
+            } else if (upgradeType.effect === "diagonalShot") {
+              playerUpgrades.diagonalShot = true;
+            } else if (upgradeType.effect === "fasterBullets") {
+              playerUpgrades.fasterBullets++;
+            } else if (upgradeType.effect === "biggerBullets") {
+              playerUpgrades.biggerBullets = true;
+            } else if (upgradeType.effect === "homing") {
+              // Implement homing functionality if desired
+            } else if (upgradeType.effect === "nuke") {
+              aliens.forEach(column => {
+                column.forEach(alien => {
+                  alien.alive = false; // Destroy all enemies
+                });
+              });
+              score += 1000; // Bonus score
+            } else if (upgradeType.effect === "scoreMultiplier") {
+              scoreMultiplier *= 2; // Double points
+              setTimeout(() => {
+                scoreMultiplier /= 2; // Reset after 10 seconds
+              }, 10000);
+            } else if (upgradeType.effect === "shield") {
+              shieldActive = true;
+              setTimeout(() => {
+                shieldActive = false; // Deactivate shield after 5 seconds
+              }, 5000);
+            } else if (upgradeType.effect === "timeFreeze") {
+              setTimeout(() => {
+                // Resume enemy movement after freeze duration
+              }, 5000); // Implement functionality as needed
+            } else if (upgradeType.effect === "miniDrones") {
+              playerUpgrades.miniDrones++;
+              drones.push({ x: playerX, y: playerY, alive: true }); // Spawn mini drones
+              setTimeout(() => {
+                playerUpgrades.miniDrones--; // Remove drones after duration
+              }, 15000); // Active for 15 seconds
+            }
+          }
+          upgrades.splice(index, 1); // Remove collected upgrade
+        }
+      });
+
+      // Check if all aliens are defeated
+      if (aliens.flat().every(alien => !alien.alive)) {
+        waveCount++;
+        if (waveCount < totalWaves) {
+          alienSpeed += 0.5; // Increase speed for next wave
+          initAliens(); // Initialize next wave
+        } else {
+          gameOver = true; // Game over condition
+        }
+      }
+
+      drawHealthBar(); // Update health bar display
+    }
+
+    // Draw everything
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawPlayer();
+      drawShields();
+      drawBullets();
+      drawEnemyBullets();
+      drawAliens();
+      drawUpgrades();
+      if (gameOver) {
+        drawMessage();
+      }
+
+      // Draw mini drones
+      drones.forEach(drone => {
+        if (drone.alive) {
+          ctx.fillStyle = "#ff8800";
+          ctx.fillRect(drone.x, drone.y, 15, 15); // Draw mini drones
+        }
+      });
+    }
+
+    // Game loop
+    function gameLoop() {
+      if (!gameOver) {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // Handle keyboard input
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") {
+        leftPressed = true;
+      } else if (e.key === "ArrowRight") {
+        rightPressed = true;
+      } else if (e.key === " ") {
+        if (playerUpgrades.tripleShot) {
+          bullets.push({ x: playerX + playerWidth / 2 - bulletWidth / 2, y: playerY, piercing: playerUpgrades.piercing });
+          bullets.push({ x: playerX + playerWidth / 2 - bulletWidth / 2 - 10, y: playerY, piercing: playerUpgrades.piercing }); // Left bullet
+          bullets.push({ x: playerX + playerWidth / 2 - bulletWidth / 2 + 10, y: playerY, piercing: playerUpgrades.piercing }); // Right bullet
+        } else if (playerUpgrades.doubleShot) {
+          bullets.push({ x: playerX + playerWidth / 2 - bulletWidth / 2, y: playerY, piercing: playerUpgrades.piercing });
+          bullets.push({ x: playerX + playerWidth / 2 - bulletWidth / 2 + 10, y: playerY, piercing: playerUpgrades.piercing }); // Right bullet
+        } else {
+          bullets.push({ x: playerX + playerWidth / 2 - bulletWidth / 2, y: playerY, piercing: playerUpgrades.piercing });
+        }
+      }
+    });
+
+    document.addEventListener("keyup", (e) => {
+      if (e.key === "ArrowLeft") {
+        leftPressed = false;
+      } else if (e.key === "ArrowRight") {
+        rightPressed = false;
+      }
+    });
+
+    // Move player continuously
+    function movePlayer() {
+      if (leftPressed && playerX > 0) {
+        playerX -= 5 + playerUpgrades.speed; // Move left
+      }
+      if (rightPressed && playerX < canvas.width - playerWidth) {
+        playerX += 5 + playerUpgrades.speed; // Move right
+      }
+    }
+
+    // Start game
+    initAliens();
+    gameLoop();
+    setInterval(movePlayer, 20); // Move player every 20 ms
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Castle Defender - Bloons Edition (Fixed Non-Homing Projectiles)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #222;
+      font-family: Arial, sans-serif;
+      color: #fff;
+    }
+    #ui {
+      background: #333;
+      padding: 10px;
+      text-align: center;
+    }
+    #ui button, #ui input, #ui label {
+      margin: 5px;
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+    #upgradeInfo {
+      margin-top: 5px;
+      font-style: italic;
+      color: #ff0;
+    }
+    #extraControls {
+      margin-top: 10px;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+  <!-- UI Panel -->
+  <div id="ui">
+    <span id="money">Money: $100</span> |
+    <span id="wave">Wave: 0 / 1000</span> |
+    <span id="castleHealth">Castle Health: 100</span> |
+    <span id="speedDisplay">Speed: 1.0x</span>
+    <br>
+    Game Speed: <input type="range" id="speedSlider" min="0.5" max="50" step="0.1" value="1">
+    <br>
+    <button id="startWave">Start Wave</button>
+    <label>
+      <input type="checkbox" id="autoNextToggle"> Auto Next Round
+    </label>
+    <br>
+    <!-- Tower Selection Buttons -->
+    <button id="basicTower">Basic Tower ($50)</button>
+    <button id="slowTower">Slow Tower ($70)</button>
+    <button id="sniperTower">Sniper Tower ($80)</button>
+    <button id="splashTower">Splash Tower ($60)</button>
+    <button id="machineTower">Machine Gun Tower ($75)</button>
+    <button id="cannonTower">Cannon Tower ($90)</button>
+    <button id="laserTower">Laser Tower ($100)</button>
+    <button id="shockTower">Shock Tower ($110)</button>
+    <br>
+    <!-- Premium Towers -->
+    <button id="railgunTower">Railgun Tower ($150)</button>
+    <button id="mortarTower">Mortar Tower ($160)</button>
+    <br>
+    <span id="selectedTower">Selected Tower: None</span>
+    <button id="upgradeTower">Upgrade Tower</button>
+    <div id="upgradeInfo">Upgrade Info: None</div>
+    <!-- Extra Control Buttons -->
+    <div id="extraControls">
+      <button id="backButton">Back</button>
+      <button id="pauseButton">Pause</button>
+      <button id="restartButton">Restart</button>
+    </div>
+  </div>
+
+  <!-- Game Canvas -->
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script>
+  (function() {
+    "use strict";
+
+    // ---------------------------
+    // Particle System for Projectiles & Laser Trails
+    // ---------------------------
+    class Particle {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 50;
+        this.vy = (Math.random() - 0.5) * 50;
+        this.life = 0.5; // seconds
+        this.color = color;
+      }
+      update(delta) {
+        this.x += this.vx * delta;
+        this.y += this.vy * delta;
+        this.life -= delta;
+      }
+      draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = Math.max(this.life, 0);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+    }
+    let particles = [];
+
+    // ---------------------------
+    // Burning Zones (for lingering mortar explosions)
+    // ---------------------------
+    let burningZones = [];
+    function updateBurningZones(delta) {
+      for (let i = burningZones.length - 1; i >= 0; i--) {
+        let zone = burningZones[i];
+        zone.life -= delta;
+        if (zone.life <= 0) {
+          burningZones.splice(i, 1);
+        } else {
+          enemies.forEach(enemy => {
+            if (Math.hypot(enemy.x - zone.x, enemy.y - zone.y) < zone.radius) {
+              enemy.health -= zone.damage * delta;
+            }
+          });
+        }
+      }
+    }
+    function drawBurningZones(ctx) {
+      burningZones.forEach(zone => {
+        ctx.fillStyle = "rgba(255,69,0,0.3)";
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // ---------------------------
+    // Helper Function: Rounded Rectangle
+    // ---------------------------
+    function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+      if (typeof radius === "undefined") { radius = 5; }
+      if (typeof radius === "number") { radius = { tl: radius, tr: radius, br: radius, bl: radius }; }
+      else { let defaultRadius = { tl: 0, tr: 0, br: 0, bl: 0 }; for (let side in defaultRadius) { radius[side] = radius[side] || defaultRadius[side]; } }
+      ctx.beginPath();
+      ctx.moveTo(x + radius.tl, y);
+      ctx.lineTo(x + width - radius.tr, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius.tr);
+      ctx.lineTo(x + width, y + height - radius.br);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius.br, y + height);
+      ctx.lineTo(x + radius.bl, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius.bl);
+      ctx.lineTo(x, y + radius.tl);
+      ctx.quadraticCurveTo(x, y, x + radius.tl, y);
+      ctx.closePath();
+      if (fill) ctx.fill();
+      if (stroke) ctx.stroke();
+    }
+
+    // ---------------------------
+    // Get Canvas & UI Elements
+    // ---------------------------
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const moneyDisplay = document.getElementById("money");
+    const waveDisplay = document.getElementById("wave");
+    const castleHealthDisplay = document.getElementById("castleHealth");
+    const speedDisplay = document.getElementById("speedDisplay");
+    const speedSlider = document.getElementById("speedSlider");
+    const startWaveBtn = document.getElementById("startWave");
+    const autoNextToggle = document.getElementById("autoNextToggle");
+
+    const basicTowerBtn = document.getElementById("basicTower");
+    const slowTowerBtn = document.getElementById("slowTower");
+    const sniperTowerBtn = document.getElementById("sniperTower");
+    const splashTowerBtn = document.getElementById("splashTower");
+    const machineTowerBtn = document.getElementById("machineTower");
+    const cannonTowerBtn = document.getElementById("cannonTower");
+    const laserTowerBtn = document.getElementById("laserTower");
+    const shockTowerBtn = document.getElementById("shockTower");
+    const railgunTowerBtn = document.getElementById("railgunTower");
+    const mortarTowerBtn = document.getElementById("mortarTower");
+
+    const selectedTowerDisplay = document.getElementById("selectedTower");
+    const upgradeTowerBtn = document.getElementById("upgradeTower");
+    const upgradeInfoDisplay = document.getElementById("upgradeInfo");
+
+    const backButton = document.getElementById("backButton");
+    const pauseButton = document.getElementById("pauseButton");
+    const restartButton = document.getElementById("restartButton");
+
+    // ---------------------------
+    // Global Game Variables
+    // ---------------------------
+    let money = 100;
+    let castleHealth = 100;
+    let gameSpeed = 1.0;
+    const totalWaves = 1000;
+    const waves = [];
+
+    // ---------------------------
+    // Exponential Wave Generation with Many Bloon Variants
+    // ---------------------------
+    function generateWave(waveNumber) {
+      let waveEnemies = [];
+      function addEnemies(type, threshold, base, scale) {
+        if (waveNumber >= threshold) {
+          let count = Math.floor(base * Math.exp((waveNumber - threshold) / scale));
+          for (let i = 0; i < count; i++) {
+            waveEnemies.push(type);
+          }
+        }
+      }
+      addEnemies("red",    1,   2, 300);
+      addEnemies("blue",   20,  1, 300);
+      addEnemies("green",  40,  1, 300);
+      addEnemies("yellow", 60,  1, 300);
+      addEnemies("pink",   80,  1, 300);
+      addEnemies("black",  100, 0.5, 300);
+      addEnemies("white",  120, 0.5, 300);
+      addEnemies("lead",   150, 0.5, 300);
+      addEnemies("moab",   200, 0.2, 300);
+      addEnemies("bfb",    250, 0.1, 300);
+      addEnemies("zebra",  300, 0.1, 300);
+      addEnemies("rainbow",350, 0.1, 300);
+      
+      for (let j = waveEnemies.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        [waveEnemies[j], waveEnemies[k]] = [waveEnemies[k], waveEnemies[j]];
+      }
+      return { enemies: waveEnemies };
+    }
+    for (let i = 1; i <= totalWaves; i++) {
+      waves.push(generateWave(i));
+    }
+    let currentWaveIndex = 0;
+    let waveActive = false;
+    let currentWaveEnemies = [];
+    let spawnTimer = 0;
+    const spawnInterval = 500;
+    let waveCooldown = 0;
+    const nextWaveDelay = 3000;
+
+    // ---------------------------
+    // Arrays for Game Objects
+    // ---------------------------
+    const towers = [];
+    const enemies = [];
+    const bullets = [];
+
+    let selectedTowerType = null;
+    let selectedTowerObject = null;
+
+    // ---------------------------
+    // Enemy Path & Tower Placement Restriction
+    // ---------------------------
+    const path = [
+      { x: 800, y: 300 },
+      { x: 600, y: 300 },
+      { x: 400, y: 150 },
+      { x: 200, y: 150 },
+      { x: 0,   y: 300 }
+    ];
+    const pathBlockThreshold = 30;
+    function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    function distanceToSegment(px, py, x1, y1, x2, y2) {
+      const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1;
+      const dot = A * C + B * D;
+      const len_sq = C * C + D * D;
+      let param = (len_sq !== 0) ? dot / len_sq : -1;
+      let xx, yy;
+      if (param < 0) { xx = x1; yy = y1; }
+      else if (param > 1) { xx = x2; yy = y2; }
+      else { xx = x1 + param * C; yy = y1 + param * D; }
+      const dx = px - xx, dy = py - yy;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    function isOnPath(x, y) {
+      for (let i = 0; i < path.length - 1; i++) {
+        if (distanceToSegment(x, y, path[i].x, path[i].y, path[i+1].x, path[i+1].y) < pathBlockThreshold) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // ---------------------------
+    // Enemy Class with Many Bloon Variants
+    // ---------------------------
+    class Enemy {
+      constructor(type) {
+        this.type = type;
+        const enemyData = {
+          "grunt":   { speed: 50, health: 10, reward: 10,  color: "red" },
+          "runner":  { speed: 80, health: 6,  reward: 12,  color: "orange" },
+          "tank":    { speed: 30, health: 20, reward: 20,  color: "purple" },
+          "red":     { speed: 40, health: 8,  reward: 2,   color: "red" },
+          "blue":    { speed: 70, health: 12, reward: 3,   color: "blue" },
+          "green":   { speed: 50, health: 15, reward: 3,   color: "green" },
+          "yellow":  { speed: 90, health: 8,  reward: 2,   color: "yellow" },
+          "pink":    { speed: 60, health: 18, reward: 3,   color: "pink" },
+          "black":   { speed: 40, health: 25, reward: 4,   color: "black" },
+          "white":   { speed: 80, health: 10, reward: 3,   color: "white" },
+          "lead":    { speed: 35, health: 30, reward: 5,   color: "gray" },
+          "moab":    { speed: 20, health: 100, reward: 10,  color: "brown" },
+          "bfb":     { speed: 30, health: 150, reward: 15,  color: "darkgreen" },
+          "zebra":   { speed: 40, health: 200, reward: 20,  color: "silver" },
+          "rainbow": { speed: 50, health: 250, reward: 25,  color: "magenta" }
+        };
+        const data = enemyData[type] || enemyData["grunt"];
+        this.speed = data.speed;
+        this.health = data.health;
+        this.maxHealth = data.health;
+        this.reward = data.reward;
+        this.color = data.color;
+        this.x = path[0].x;
+        this.y = path[0].y;
+        this.pathIndex = 1;
+        this.slowTimer = 0;
+      }
+      update(delta) {
+        if (this.slowTimer > 0) this.slowTimer -= delta;
+        const effectiveSpeed = this.speed * (this.slowTimer > 0 ? 0.5 : 1);
+        if (this.pathIndex >= path.length) return;
+        const target = path[this.pathIndex];
+        const dx = target.x - this.x, dy = target.y - this.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < effectiveSpeed * delta) {
+          this.x = target.x;
+          this.y = target.y;
+          this.pathIndex++;
+          if (this.pathIndex >= path.length) {
+            castleHealth -= 10;
+            this.health = 0;
+          }
+        } else {
+          const angle = Math.atan2(dy, dx);
+          this.x += Math.cos(angle) * effectiveSpeed * delta;
+          this.y += Math.sin(angle) * effectiveSpeed * delta;
+        }
+      }
+      draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.fillRect(this.x - 10, this.y - 15, 20, 4);
+        ctx.fillStyle = "green";
+        ctx.fillRect(this.x - 10, this.y - 15, 20 * (this.health / this.maxHealth), 4);
+      }
+    }
+
+    // ---------------------------
+    // Tower Class with Unique Upgrades & Premium Towers
+    // ---------------------------
+    class Tower {
+      constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        // Tower starts at “base” level 1; two upgrades will bring it to level 3.
+        this.upgradeLevel = 1;
+        // Set common defaults where needed:
+        this.rangeMult = 1;
+        this.damageMult = 1;
+        this.fireRateMult = 1;
+        // Basic Towers
+        if (type === "basic") {
+          this.range = 120;
+          this.fireRate = 1;
+          this.cooldown = 0;
+          this.bulletDamage = 5;
+          this.bulletEffect = null;
+          this.bulletStyle = "default";
+          this.cost = 50;
+          this.baseUpgradeCost = 40;
+          this.color = "blue";
+        } else if (type === "slow") {
+          this.range = 100;
+          this.fireRate = 0.8;
+          this.cooldown = 0;
+          this.bulletDamage = 3;
+          this.bulletEffect = "slow";
+          this.bulletStyle = "default";
+          this.cost = 70;
+          this.baseUpgradeCost = 50;
+          this.color = "cyan";
+          this.slowDuration = 2;
+        } else if (type === "sniper") {
+          this.range = 200;
+          this.fireRate = 0.3;
+          this.cooldown = 0;
+          this.bulletDamage = 15;
+          this.bulletEffect = null;
+          this.bulletStyle = "sniper";
+          this.cost = 80;
+          this.baseUpgradeCost = 60;
+          this.color = "darkblue";
+          this.ricochet = false;
+          this.maxRicochet = 0;
+        } else if (type === "splash") {
+          this.range = 90;
+          this.fireRate = 0.8;
+          this.cooldown = 0;
+          this.bulletDamage = 7;
+          this.bulletEffect = "splash";
+          this.bulletStyle = "default";
+          this.cost = 60;
+          this.baseUpgradeCost = 50;
+          this.color = "magenta";
+          this.splashRadius = 30;
+        } else if (type === "machine") {
+          this.range = 100;
+          this.fireRate = 5;
+          this.cooldown = 0;
+          this.bulletDamage = 2;
+          this.bulletEffect = null;
+          this.bulletStyle = "machine";
+          this.cost = 75;
+          this.baseUpgradeCost = 60;
+          this.color = "gold";
+        } else if (type === "cannon") {
+          this.range = 130;
+          this.fireRate = 0.5;
+          this.cooldown = 0;
+          this.bulletDamage = 20;
+          this.bulletEffect = "explosive";
+          this.bulletStyle = "cannon";
+          this.cost = 90;
+          this.baseUpgradeCost = 80;
+          this.color = "brown";
+          this.clusterBomb = false;
+          this.barrage = false;
+        }
+        // Special Towers
+        else if (type === "laser") {
+          this.range = 150;
+          this.fireRate = 0;
+          this.cooldown = 0;
+          this.laserDamage = 4;
+          this.cost = 100;
+          this.baseUpgradeCost = 80;
+          this.color = "lime";
+          this.currentTarget = null;
+          this.splitBeam = false;
+          this.laserOvercharge = false;
+          this.freezeBeam = false;
+        } else if (type === "shock") {
+          this.range = 130;
+          this.fireRate = 1;
+          this.cooldown = 0;
+          this.bulletDamage = 10;
+          this.bulletEffect = "chain";
+          this.bulletStyle = "shock";
+          this.cost = 110;
+          this.baseUpgradeCost = 80;
+          this.color = "violet";
+          this.chainBounce = 2;
+        }
+        // Premium Towers
+        else if (type === "railgun") {
+          this.range = 250;
+          this.fireRate = 0.2;
+          this.cooldown = 0;
+          this.bulletDamage = 50;
+          this.bulletEffect = "piercing";
+          this.bulletStyle = "railgun";
+          this.cost = 150;
+          this.baseUpgradeCost = 120;
+          this.color = "maroon";
+          this.piercing = false;
+          this.shockBonus = false;
+        } else if (type === "mortar") {
+          this.range = 180;
+          this.fireRate = 0.4;
+          this.cooldown = 0;
+          this.bulletDamage = 40;
+          this.bulletEffect = "explosive";
+          this.bulletStyle = "mortar";
+          this.cost = 160;
+          this.baseUpgradeCost = 130;
+          this.color = "sienna";
+          this.fragmentation = false;
+          this.mortarLingering = false;
+        }
+      }
+      update(delta) {
+        // Laser towers work continuously
+        if (this.type === "laser") {
+          if (this.upgradeLevel >= 2 && this.splitBeam) {
+            let targets = [];
+            for (let enemy of enemies) {
+              if (enemy.health > 0 && distance(this, enemy) <= this.range) {
+                targets.push(enemy);
+              }
+            }
+            for (let target of targets) {
+              target.health -= this.laserDamage * delta;
+              if (Math.random() < 0.5) {
+                let t = Math.random();
+                let bx = this.x + (target.x - this.x) * t;
+                let by = this.y + (target.y - this.y) * t;
+                particles.push(new Particle(bx, by, "lightgreen"));
+              }
+            }
+            if (this.freezeBeam) {
+              for (let target of targets) {
+                target.slowTimer = Math.max(target.slowTimer, 2);
+              }
+            }
+          } else {
+            if (!this.currentTarget || this.currentTarget.health <= 0 || distance(this, this.currentTarget) > this.range) {
+              this.currentTarget = null;
+              for (let enemy of enemies) {
+                if (enemy.health > 0 && distance(this, enemy) <= this.range) {
+                  this.currentTarget = enemy;
+                  break;
+                }
+              }
+            }
+            if (this.currentTarget) {
+              this.currentTarget.health -= this.laserDamage * delta;
+              if (Math.random() < 0.7) {
+                let t = Math.random();
+                let bx = this.x + (this.currentTarget.x - this.x) * t;
+                let by = this.y + (this.currentTarget.y - this.y) * t;
+                particles.push(new Particle(bx, by, "lightgreen"));
+              }
+              if (this.freezeBeam) {
+                this.currentTarget.slowTimer = Math.max(this.currentTarget.slowTimer, 2);
+              }
+            }
+          }
+          return;
+        }
+        // Standard towers fire if cooldown elapsed.
+        this.cooldown -= delta;
+        if (this.cooldown <= 0) {
+          let target = null;
+          for (let enemy of enemies) {
+            if (enemy.health > 0 && distance(this, enemy) <= this.range) {
+              target = enemy;
+              break;
+            }
+          }
+          if (target) {
+            // Create bullet with fixed trajectory (non-homing).
+            let b = new Bullet(this.x, this.y, target, this.bulletDamage, this.bulletEffect, this.bulletStyle);
+            if (this.type === "cannon") {
+              if (this.clusterBomb) b.cluster = true;
+              if (this.barrage) b.barrage = true;
+            }
+            if (this.type === "shock") {
+              b.chainLimit = this.chainBounce;
+            }
+            if (this.type === "sniper" && this.ricochet) {
+              b.ricochet = true;
+              b.ricochetCount = 0;
+              b.maxRicochet = this.maxRicochet;
+            }
+            if (this.type === "mortar" && this.mortarLingering) {
+              b.lingering = true;
+            }
+            bullets.push(b);
+            this.cooldown = 1 / this.fireRate;
+          }
+        }
+      }
+      draw(ctx) {
+        switch (this.type) {
+          case "basic":
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - 10, this.y - 10, 20, 20);
+            ctx.strokeStyle = "black";
+            ctx.beginPath();
+            ctx.moveTo(this.x - 10, this.y);
+            ctx.lineTo(this.x + 10, this.y);
+            ctx.moveTo(this.x, this.y - 10);
+            ctx.lineTo(this.x, this.y + 10);
+            ctx.stroke();
+            break;
+          case "slow":
+            ctx.fillStyle = this.color;
+            roundRect(ctx, this.x - 10, this.y - 10, 20, 20, 4, true, true);
+            break;
+          case "sniper":
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - 4, this.y - 16, 8, 32);
+            ctx.strokeStyle = "black";
+            ctx.strokeRect(this.x - 4, this.y - 16, 8, 32);
+            break;
+          case "splash":
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 16, 0, Math.PI * 2);
+            ctx.stroke();
+            break;
+          case "machine":
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - 8, this.y - 8, 16, 16);
+            ctx.fillStyle = "black";
+            ctx.fillRect(this.x - 3, this.y - 10, 6, 4);
+            break;
+          case "cannon":
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - 8, this.y - 12, 16, 24);
+            ctx.fillStyle = "black";
+            ctx.fillRect(this.x - 2, this.y - 20, 4, 8);
+            break;
+          case "laser":
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - 6, this.y, 12, 20);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 6, 0, Math.PI, true);
+            ctx.fill();
+            break;
+          case "shock":
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+              let angle = Math.PI / 3 * i;
+              let px = this.x + 12 * Math.cos(angle);
+              let py = this.y + 12 * Math.sin(angle);
+              if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            break;
+          case "railgun":
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x - 6, this.y - 6, 12, 12);
+            ctx.fillStyle = "black";
+            ctx.fillRect(this.x - 2, this.y - 18, 4, 12);
+            break;
+          case "mortar":
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.x + 10, this.y - 15);
+            ctx.stroke();
+            break;
+          default:
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 15, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
+        ctx.stroke();
+        if (this.type === "laser") {
+          if (this.upgradeLevel >= 2 && this.splitBeam) {
+            // No single beam drawn.
+          } else if (this.currentTarget) {
+            ctx.strokeStyle = "lime";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.currentTarget.x, this.currentTarget.y);
+            ctx.stroke();
+          }
+        }
+      }
+      upgrade() {
+        const cost = this.baseUpgradeCost * this.upgradeLevel;
+        if (money >= cost) {
+          money -= cost;
+          this.upgradeLevel++;
+          switch (this.type) {
+            case "basic":
+              if (this.upgradeLevel === 2) {
+                this.range *= 1.15;
+                this.bulletDamage *= 1.10;
+                this.color = "lightblue";
+              } else if (this.upgradeLevel === 3) {
+                this.fireRate *= 1.5;
+                this.color = "dodgerblue";
+              }
+              break;
+            case "slow":
+              if (this.upgradeLevel === 2) {
+                this.slowDuration += 1;
+                this.color = "aqua";
+              } else if (this.upgradeLevel === 3) {
+                this.bulletEffect = "areaSlow";
+                this.color = "turquoise";
+              }
+              break;
+            case "sniper":
+              if (this.upgradeLevel === 2) {
+                this.bulletDamage *= 1.20;
+                this.range *= 1.10;
+                this.color = "cornflowerblue";
+              } else if (this.upgradeLevel === 3) {
+                this.ricochet = true;
+                this.maxRicochet = 3;
+                this.color = "royalblue";
+              }
+              break;
+            case "splash":
+              if (this.upgradeLevel === 2) {
+                this.splashRadius *= 1.5;
+                this.color = "hotpink";
+              } else if (this.upgradeLevel === 3) {
+                this.bulletEffect = "explosive";
+                this.color = "deeppink";
+              }
+              break;
+            case "machine":
+              if (this.upgradeLevel === 2) {
+                this.fireRate *= 1.3;
+                this.color = "goldenrod";
+              } else if (this.upgradeLevel === 3) {
+                this.bulletEffect = "suppress";
+                this.color = "gold";
+              }
+              break;
+            case "cannon":
+              if (this.upgradeLevel === 2) {
+                this.clusterBomb = true;
+                this.color = "darkorange";
+              } else if (this.upgradeLevel === 3) {
+                this.bulletDamage *= 1.4;
+                this.range *= 1.15;
+                this.bulletEffect = "explosive";
+                this.color = "orangered";
+              }
+              break;
+            case "laser":
+              if (this.upgradeLevel === 2) {
+                this.splitBeam = true;
+                this.color = "darkgreen";
+              } else if (this.upgradeLevel === 3) {
+                this.freezeBeam = true;
+                this.laserDamage *= 1.2;
+                this.color = "deepskyblue";
+              }
+              break;
+            case "shock":
+              if (this.upgradeLevel === 2) {
+                this.chainBounce += 1;
+                this.color = "indigo";
+              } else if (this.upgradeLevel === 3) {
+                this.bulletEffect = "stun";
+                this.color = "violet";
+              }
+              break;
+            case "railgun":
+              if (this.upgradeLevel === 2) {
+                this.bulletDamage *= 1.3;
+                this.range *= 1.10;
+                this.piercing = true;
+                this.color = "darkred";
+              } else if (this.upgradeLevel === 3) {
+                this.bulletDamage *= 1.4;
+                this.range *= 1.10;
+                this.shockBonus = true;
+                this.color = "firebrick";
+              }
+              break;
+            case "mortar":
+              if (this.upgradeLevel === 2) {
+                this.fragmentation = true;
+                this.color = "peru";
+              } else if (this.upgradeLevel === 3) {
+                this.mortarLingering = true;
+                this.color = "crimson";
+              }
+              break;
+            default:
+              this.bulletDamage *= 1.2;
+              this.range *= 1.1;
+              this.fireRate *= 1.2;
+          }
+          this.bulletDamage *= 1.05;
+          this.range *= 1.05;
+          this.fireRate *= 1.05;
+          return true;
+        } else {
+          return false;
+        }
+      }
+    }
+
+    // ---------------------------
+    // Bullet Class with Fixed (Non-Homing) Trajectory
+    // ---------------------------
+    class Bullet {
+      constructor(x, y, target, damage, effect, style) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.speed = 200;
+        this.damage = damage;
+        this.effect = effect;
+        this.style = style;
+        this.hit = false;
+        // Compute the fixed angle at firing time.
+        // Aim slightly in front of the enemy using its current movement.
+        if (target && target.pathIndex < path.length) {
+          let nextWaypoint = path[target.pathIndex];
+          let enemyAngle = Math.atan2(nextWaypoint.y - target.y, nextWaypoint.x - target.x);
+          let leadDistance = target.speed * 0.2; // Adjust this factor to change how far ahead you aim.
+          let predictedX = target.x + Math.cos(enemyAngle) * leadDistance;
+          let predictedY = target.y + Math.sin(enemyAngle) * leadDistance;
+          this.fixedAngle = Math.atan2(predictedY - y, predictedX - x);
+        } else {
+          const dx = target.x - x;
+          const dy = target.y - y;
+          this.fixedAngle = Math.atan2(dy, dx);
+        }
+        // Additional properties for special behaviors:
+        this.cluster = false;
+        this.clusterSpawned = false;
+        this.barrage = false;
+        this.barrageSpawned = false;
+        this.chainLimit = 2;
+        this.ricochet = false;
+        this.ricochetCount = 0;
+        this.maxRicochet = 0;
+        this.lingering = false;
+        this.fragmentation = false;
+        this.fragmentSpawned = false;
+        this.fixedAngle; // now set at creation
+      }
+      adjustAngle(angleOffset) {
+        this.fixedAngle = Math.atan2(this.target.y - this.y, this.target.x - this.x) + angleOffset;
+      }
+      update(delta) {
+        // Emit particles along the bullet’s fixed trajectory.
+        if (Math.random() < 0.3) {
+          let particleColor;
+          switch (this.style) {
+            case "machine": particleColor = "gray"; break;
+            case "cannon": particleColor = "darkred"; break;
+            case "sniper": particleColor = "black"; break;
+            case "shock":  particleColor = "violet"; break;
+            case "railgun": particleColor = "maroon"; break;
+            case "mortar": particleColor = "sienna"; break;
+            default: particleColor = "black";
+          }
+          particles.push(new Particle(this.x, this.y, particleColor));
+        }
+        // Move bullet along its fixed trajectory.
+        this.x += Math.cos(this.fixedAngle) * this.speed * delta;
+        this.y += Math.sin(this.fixedAngle) * this.speed * delta;
+        // Check for collision with the original target.
+        if (this.target && distance(this, this.target) < 5) {
+          this.target.health -= this.damage;
+          // Process special effects:
+          if (this.effect === "slow") {
+            this.target.slowTimer = 2;
+          } else if (this.effect === "areaSlow") {
+            this.target.slowTimer = 3;
+            enemies.forEach(enemy => {
+              if (enemy !== this.target && distance({ x: this.x, y: this.y }, enemy) < 30) {
+                enemy.slowTimer = 3;
+              }
+            });
+          } else if (this.effect === "suppress") {
+            this.target.slowTimer = 1.5;
+          } else if (this.effect === "stun") {
+            this.target.slowTimer = 4;
+          } else if (this.effect === "splash" || this.effect === "explosive") {
+            const splashRadius = 30;
+            enemies.forEach(enemy => {
+              if (enemy !== this.target && enemy.health > 0 && distance({ x: this.x, y: this.y }, enemy) <= splashRadius) {
+                enemy.health -= this.damage * 0.5;
+              }
+            });
+          } else if (this.effect === "chain") {
+            const chainRadius = 50;
+            let chainCount = 0;
+            const limit = this.chainLimit;
+            enemies.forEach(enemy => {
+              if (enemy !== this.target && enemy.health > 0 && distance({ x: this.x, y: this.y }, enemy) <= chainRadius && chainCount < limit) {
+                enemy.health -= this.damage * 0.5;
+                chainCount++;
+              }
+            });
+          }
+          // Ricochet: if enabled, try to retarget nearby enemy.
+          if (this.ricochet && this.ricochetCount < this.maxRicochet) {
+            let newTarget = null;
+            for (let enemy of enemies) {
+              if (enemy !== this.target && enemy.health > 0 && distance(enemy, this.target) < 50) {
+                newTarget = enemy;
+                break;
+              }
+            }
+            if (newTarget) {
+              this.ricochetCount++;
+              this.target = newTarget;
+              if (newTarget && newTarget.pathIndex < path.length) {
+                let nextWaypoint = path[newTarget.pathIndex];
+                let enemyAngle = Math.atan2(nextWaypoint.y - newTarget.y, nextWaypoint.x - newTarget.x);
+                let leadDistance = newTarget.speed * 0.2;
+                let predictedX = newTarget.x + Math.cos(enemyAngle) * leadDistance;
+                let predictedY = newTarget.y + Math.sin(enemyAngle) * leadDistance;
+                this.fixedAngle = Math.atan2(predictedY - this.y, predictedX - this.x);
+              } else {
+                let dx = newTarget.x - this.x;
+                let dy = newTarget.y - this.y;
+                this.fixedAngle = Math.atan2(dy, dx);
+              }
+              return; // Continue bullet travel with new fixed angle.
+            }
+          }
+          // Handle cannon cluster upgrade.
+          if (this.style === "cannon" && this.cluster && !this.clusterSpawned) {
+            this.clusterSpawned = true;
+            for (let offset of [-0.3, 0, 0.3]) {
+              let newBullet = new Bullet(this.x, this.y, this.target, this.damage * 0.5, this.effect, this.style);
+              newBullet.adjustAngle(offset);
+              bullets.push(newBullet);
+            }
+          }
+          // Handle barrage upgrade.
+          if (this.barrage && !this.barrageSpawned) {
+            this.barrageSpawned = true;
+            for (let offset of [-0.5, -0.25, 0, 0.25, 0.5]) {
+              let newBullet = new Bullet(this.x, this.y, this.target, this.damage * 0.3, this.effect, this.style);
+              newBullet.adjustAngle(offset);
+              bullets.push(newBullet);
+            }
+          }
+          // Mortar fragmentation upgrade.
+          if (this.style === "mortar" && this.fragmentation && !this.fragmentSpawned) {
+            this.fragmentSpawned = true;
+            for (let offset of [-0.4, 0, 0.4]) {
+              let newBullet = new Bullet(this.x, this.y, this.target, this.damage * 0.5, this.effect, this.style);
+              newBullet.adjustAngle(offset);
+              bullets.push(newBullet);
+            }
+          }
+          // Mortar lingering: create a burning zone.
+          if (this.style === "mortar" && this.lingering) {
+            burningZones.push({ x: this.x, y: this.y, radius: 30, life: 3, damage: 5 });
+          }
+          this.hit = true;
+        }
+      }
+      draw(ctx) {
+        if (this.style === "machine") {
+          ctx.fillStyle = "black";
+          ctx.fillRect(this.x - 2, this.y - 2, 4, 4);
+        } else if (this.style === "cannon") {
+          ctx.fillStyle = "darkred";
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (this.style === "sniper") {
+          ctx.fillStyle = "black";
+          ctx.fillRect(this.x - 1, this.y - 3, 2, 6);
+        } else if (this.style === "shock") {
+          ctx.strokeStyle = "violet";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(this.x - 3, this.y - 3);
+          ctx.lineTo(this.x + 3, this.y + 3);
+          ctx.stroke();
+        } else if (this.style === "railgun") {
+          ctx.strokeStyle = "maroon";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(this.x - 3, this.y - 3);
+          ctx.lineTo(this.x + 3, this.y + 3);
+          ctx.stroke();
+        } else if (this.style === "mortar") {
+          ctx.fillStyle = "sienna";
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = "black";
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // ---------------------------
+    // Global Game Control Variables
+    // ---------------------------
+    let paused = false;
+
+    // ---------------------------
+    // Game Loop & Wave System
+    // ---------------------------
+    let lastTime = performance.now();
+    function gameLoop(timestamp) {
+      let delta = (timestamp - lastTime) / 1000;
+      lastTime = timestamp;
+      delta *= gameSpeed;
+      if (!paused) {
+        update(delta);
+      }
+      draw();
+      if (castleHealth > 0) {
+        requestAnimationFrame(gameLoop);
+      } else {
+        gameOver();
+      }
+    }
+    function update(delta) {
+      if (waveActive && currentWaveEnemies.length > 0) {
+        spawnTimer += delta * 1000;
+        if (spawnTimer >= spawnInterval) {
+          spawnTimer = 0;
+          const enemyType = currentWaveEnemies.shift();
+          enemies.push(new Enemy(enemyType));
+        }
+      }
+      if (waveActive && currentWaveEnemies.length === 0 && enemies.length === 0) {
+        waveActive = false;
+        waveCooldown = nextWaveDelay / 1000;
+      }
+      if (!waveActive && waveCooldown > 0) {
+        waveCooldown -= delta;
+        if (waveCooldown < 0) waveCooldown = 0;
+      }
+      if (!waveActive && waveCooldown === 0 && autoNextToggle.checked && currentWaveIndex < waves.length) {
+        waveActive = true;
+        currentWaveEnemies = waves[currentWaveIndex].enemies.slice();
+        currentWaveIndex++;
+      }
+      enemies.forEach(enemy => enemy.update(delta));
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        if (enemies[i].health <= 0) {
+          if (enemies[i].pathIndex < path.length) money += enemies[i].reward;
+          enemies.splice(i, 1);
+        }
+      }
+      towers.forEach(tower => tower.update(delta));
+      bullets.forEach(bullet => bullet.update(delta));
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        if (bullets[i].hit ||
+            bullets[i].x < 0 || bullets[i].x > canvas.width ||
+            bullets[i].y < 0 || bullets[i].y > canvas.height) {
+          bullets.splice(i, 1);
+        }
+      }
+      updateBurningZones(delta);
+      particles.forEach(p => p.update(delta));
+      particles = particles.filter(p => p.life > 0);
+      updateUI();
+    }
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "gray";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(path[0].x, path[0].y);
+      for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = "green";
+      ctx.fillRect(0, 250, 50, 100);
+      towers.forEach(tower => tower.draw(ctx));
+      enemies.forEach(enemy => enemy.draw(ctx));
+      bullets.forEach(bullet => bullet.draw(ctx));
+      particles.forEach(p => p.draw(ctx));
+      drawBurningZones(ctx);
+    }
+    function updateUI() {
+      moneyDisplay.textContent = "Money: $" + money;
+      let waveText = "Wave: " + currentWaveIndex + " / " + totalWaves;
+      if (waveActive) waveText += " (In Progress)";
+      else if (waveCooldown > 0) waveText += " (Next in " + Math.ceil(waveCooldown) + "s)";
+      else waveText += " (Ready)";
+      waveDisplay.textContent = waveText;
+      castleHealthDisplay.textContent = "Castle Health: " + castleHealth;
+      speedDisplay.textContent = "Speed: " + gameSpeed.toFixed(1) + "x";
+      if (selectedTowerObject) {
+        const upgradeCost = selectedTowerObject.baseUpgradeCost * selectedTowerObject.upgradeLevel;
+        selectedTowerDisplay.textContent = "Selected Tower: " + selectedTowerObject.type +
+          " (Level " + selectedTowerObject.upgradeLevel + ", Upgrade Cost: $" + upgradeCost + ")";
+        upgradeInfoDisplay.textContent = "Upgrade Info: " + getUpgradeDescription(selectedTowerObject);
+      } else {
+        selectedTowerDisplay.textContent = "Selected Tower: " + (selectedTowerType ? selectedTowerType : "None");
+        upgradeInfoDisplay.textContent = "Upgrade Info: None";
+      }
+    }
+    function gameOver() {
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "white";
+      ctx.font = "40px Arial";
+      ctx.fillText("Game Over", canvas.width / 2 - 100, canvas.height / 2);
+    }
+    function getUpgradeDescription(tower) {
+      switch (tower.type) {
+        case "basic":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Extended Range – increases range and damage.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Rapid Fire – significantly increases firing speed.";
+          return "Maxed Out.";
+        case "slow":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Enhanced Slow Field – increases slow duration.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Area Slow – slows nearby enemies upon hit.";
+          return "Maxed Out.";
+        case "sniper":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: High Precision – increases damage and range.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Ricochet Shots – bullets bounce to additional targets.";
+          return "Maxed Out.";
+        case "splash":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Wider Splash – increases splash damage radius.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Explosive Rounds – bullets explode on impact.";
+          return "Maxed Out.";
+        case "machine":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Rapid Fire – further increases firing speed.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Suppressive Fire – bullets now slow enemies on hit.";
+          return "Maxed Out.";
+        case "cannon":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Cluster Bomb – projectiles spawn mini bombs.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Heavy Shell – boosts damage and area effect.";
+          return "Maxed Out.";
+        case "laser":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Split Beam – laser splits to hit multiple targets.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Freeze Beam – laser slows down enemies.";
+          return "Maxed Out.";
+        case "shock":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Chain Lightning – increases bounce count.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: EMP Blast – stuns enemies on hit.";
+          return "Maxed Out.";
+        case "railgun":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Piercing Shot – increases damage and piercing effect.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Overcharged Rail – further boosts stats with shock bonus.";
+          return "Maxed Out.";
+        case "mortar":
+          if (tower.upgradeLevel === 1) return "Next Upgrade: Fragmentation Shells – shells fragment into mini mortars.";
+          if (tower.upgradeLevel === 2) return "Next Upgrade: Lingering Inferno – shells leave burning zones.";
+          return "Maxed Out.";
+        default:
+          if (tower.upgradeLevel < 3) return "Next Upgrade: Improves tower stats.";
+          return "Maxed Out.";
+      }
+    }
+
+    // ---------------------------
+    // Extra Control Buttons
+    // ---------------------------
+    backButton.addEventListener("click", function() {
+      window.location.href = "games.html";
+    });
+    pauseButton.addEventListener("click", function() {
+      paused = !paused;
+      pauseButton.textContent = paused ? "Resume" : "Pause";
+    });
+    restartButton.addEventListener("click", function() {
+      money = 100;
+      castleHealth = 100;
+      gameSpeed = parseFloat(speedSlider.value);
+      currentWaveIndex = 0;
+      waveActive = false;
+      currentWaveEnemies = [];
+      spawnTimer = 0;
+      waveCooldown = 0;
+      towers.length = 0;
+      enemies.length = 0;
+      bullets.length = 0;
+      particles.length = 0;
+      burningZones.length = 0;
+      selectedTowerType = null;
+      selectedTowerObject = null;
+      pauseButton.textContent = "Pause";
+      paused = false;
+      updateUI();
+    });
+
+    // ---------------------------
+    // Other UI Listeners
+    // ---------------------------
+    speedSlider.addEventListener("input", function() {
+      gameSpeed = parseFloat(speedSlider.value);
+      speedDisplay.textContent = "Speed: " + gameSpeed.toFixed(1) + "x";
+    });
+    startWaveBtn.addEventListener("click", function() {
+      if (!waveActive && waveCooldown === 0 && currentWaveIndex < waves.length) {
+        waveActive = true;
+        currentWaveEnemies = waves[currentWaveIndex].enemies.slice();
+        currentWaveIndex++;
+      }
+    });
+    basicTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "basic";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    slowTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "slow";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    sniperTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "sniper";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    splashTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "splash";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    machineTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "machine";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    cannonTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "cannon";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    laserTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "laser";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    shockTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "shock";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    railgunTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "railgun";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    mortarTowerBtn.addEventListener("click", function() {
+      selectedTowerType = "mortar";
+      selectedTowerObject = null;
+      updateUI();
+    });
+    upgradeTowerBtn.addEventListener("click", function() {
+      if (selectedTowerObject) {
+        if (selectedTowerObject.upgrade()) updateUI();
+        else alert("Not enough money to upgrade this tower.");
+      }
+    });
+    canvas.addEventListener("click", function(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      let towerClicked = false;
+      for (let tower of towers) {
+        if (distance({ x, y }, tower) < 15) {
+          selectedTowerObject = tower;
+          selectedTowerType = null;
+          towerClicked = true;
+          break;
+        }
+      }
+      if (!towerClicked) {
+        if (selectedTowerType) {
+          if (isOnPath(x, y)) {
+            alert("Cannot place tower on enemy path!");
+            return;
+          }
+          let cost = 0;
+          switch (selectedTowerType) {
+            case "basic": cost = 50; break;
+            case "slow": cost = 70; break;
+            case "sniper": cost = 80; break;
+            case "splash": cost = 60; break;
+            case "machine": cost = 75; break;
+            case "cannon": cost = 90; break;
+            case "laser": cost = 100; break;
+            case "shock": cost = 110; break;
+            case "railgun": cost = 150; break;
+            case "mortar": cost = 160; break;
+          }
+          if (money >= cost) {
+            towers.push(new Tower(x, y, selectedTowerType));
+            money -= cost;
+          } else {
+            alert("Not enough money to place this tower.");
+          }
+        }
+        selectedTowerObject = null;
+      }
+    });
+
+    requestAnimationFrame(gameLoop);
+  })();
+  </script>
+</body>
+</html>
