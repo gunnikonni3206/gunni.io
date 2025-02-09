@@ -2,16 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Retro Chat Room</title>
   <style>
-    /* Base Retro Style */
+    /* Dark Retro Style */
     body {
       margin: 0;
       padding: 0;
-      font-family: "Courier New", Courier, monospace;
       background: #111;
-      color: #eee;
+      color: #0f0;
+      font-family: "Courier New", Courier, monospace;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
     }
     header {
       background: #222;
@@ -43,23 +46,27 @@
     nav button:hover {
       background: #0c0;
     }
-    .container {
+    .content {
       display: flex;
-      min-height: calc(100vh - 60px); /* Adjust for header height */
+      flex: 1;
+      overflow-y: auto;
     }
+    /* Increase sidebar width to 300px */
     .sidebar {
-      width: 200px;
       background: #222;
       padding: 15px;
       border-right: 3px solid #0f0;
+      width: 300px;
     }
     .sidebar h3 {
       margin-top: 0;
       color: #0f0;
+      text-align: center;
     }
     .sidebar ul {
       list-style: none;
       padding: 0;
+      color: #0f0;
     }
     .sidebar ul li {
       margin: 10px 0;
@@ -74,24 +81,42 @@
     .main {
       flex: 1;
       padding: 20px;
+      background: #111;
     }
+    /* Chat Container Styles */
     .chat-container {
-      background: #1a1a1a;
+      background: #222;
       border: 2px solid #0f0;
       border-radius: 10px;
       padding: 15px;
-      box-shadow: 0 0 10px #0f0;
-      margin: 20px auto;
-      max-width: 800px;
+      box-shadow: 0 0 15px #0f0;
+      max-height: 500px;
+      overflow-y: auto;
+      position: relative;
     }
     .chat-container h2 {
       margin-top: 0;
-      color: #0f0;
       text-align: center;
+      color: #0f0;
     }
-    /* Utterances container spacing */
-    .utterances-container {
-      margin-top: 20px;
+    /* Down-arrow button styles */
+    .scroll-down-btn {
+      position: sticky;
+      bottom: 5px;
+      display: block;
+      width: 100%;
+      padding: 5px;
+      font-size: 1.5em;
+      cursor: pointer;
+      background: #0f0;
+      color: #111;
+      border: none;
+      border-radius: 5px;
+      transition: background 0.2s;
+      margin-top: 10px;
+    }
+    .scroll-down-btn:hover {
+      background: #0c0;
     }
   </style>
 </head>
@@ -103,11 +128,11 @@
       <button onclick="location.href='subpages/about.html'">About</button>
       <button onclick="location.href='subpages/games.html'">Games</button>
       <button onclick="location.href='subpages/contact.html'">Contact</button>
-      <button onclick="location.href='subpages/chat.html'">Chat</button>
+      <button onclick="location.href='chat.html'">Chat</button>
     </nav>
   </header>
 
-  <div class="container">
+  <div class="content">
     <div class="sidebar">
       <h3>Navigation</h3>
       <ul>
@@ -115,15 +140,15 @@
         <li><a href="subpages/about.html">About</a></li>
         <li><a href="subpages/games.html">Games</a></li>
         <li><a href="subpages/contact.html">Contact</a></li>
-        <li><a href="subpages/chat.html">Chat</a></li>
+        <li><a href="chat.html">Chat</a></li>
       </ul>
     </div>
 
     <div class="main">
-      <div class="chat-container">
+      <div class="chat-container" id="chatContainer">
         <h2>Join the Conversation</h2>
-        <!-- Utterances Comments Integration -->
-        <div class="utterances-container">
+        <!-- Utterances Integration -->
+        <div id="utterancesWrapper">
           <script src="https://utteranc.es/client.js"
                   repo="gunnikonni3206/gunni.io"
                   issue-term="pathname"
@@ -134,7 +159,32 @@
           </script>
         </div>
       </div>
+      <!-- Down-arrow button to scroll to the bottom of the chat container -->
+      <button class="scroll-down-btn" onclick="scrollToBottom()">&#x2193;</button>
     </div>
   </div>
+
+  <script>
+    function scrollToBottom() {
+      const chatContainer = document.getElementById('chatContainer');
+      chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+    }
+
+    // Optional: Auto-scroll the Utterances container to the bottom once loaded
+    const utterancesWrapper = document.getElementById('utterancesWrapper');
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeName === 'IFRAME') {
+            node.addEventListener('load', () => {
+              document.getElementById('chatContainer').scrollTop =
+                document.getElementById('chatContainer').scrollHeight;
+            });
+          }
+        });
+      });
+    });
+    observer.observe(utterancesWrapper, { childList: true });
+  </script>
 </body>
 </html>

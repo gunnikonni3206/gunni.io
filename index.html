@@ -13,26 +13,23 @@
       background-size: cover;
       height: 100vh;
       margin: 0;
-      color: #000; /* Black text */
+      color: #000;
       display: flex;
       flex-direction: column;
-      background-color: rgba(0, 0, 0, 0.7); /* Dark overlay */
+      background-color: rgba(0, 0, 0, 0.7);
     }
-
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background-color: rgba(255, 255, 204, 0.8); /* Semi-transparent header */
+      background-color: rgba(255, 255, 204, 0.8);
       padding: 10px;
       border-bottom: 3px solid #663300;
     }
-
     nav {
       display: flex;
       gap: 10px;
     }
-
     nav button {
       padding: 10px 15px;
       background-color: #663300;
@@ -42,11 +39,9 @@
       border-radius: 5px;
       transition: background 0.2s;
     }
-
     nav button:hover {
       background-color: #993300;
     }
-
     h1 {
       font-size: 3em;
       text-align: center;
@@ -56,115 +51,94 @@
       border: 3px outset #663300;
       margin: 0;
     }
-
     .content {
       display: flex;
       flex: 1;
     }
-
+    /* Increased sidebar width to 300px */
     .sidebar {
       background-color: rgba(255, 255, 204, 0.8);
       padding: 15px;
       border-right: 3px solid #663300;
-      width: 200px;
+      width: 300px;
       box-shadow: 2px 0 5px rgba(0, 0, 0, 0.3);
     }
-
     .sidebar h3 {
       margin-top: 0;
       color: #000;
       text-align: center;
     }
-
     .sidebar ul {
       list-style: none;
       padding: 0;
     }
-
     .sidebar ul li {
       margin: 10px 0;
     }
-
     .sidebar ul li a {
       color: #000;
       text-decoration: none;
     }
-
     .sidebar ul li a:hover {
       text-decoration: underline;
     }
-
     .main {
       flex: 1;
       padding: 20px;
     }
-
     p {
       font-size: 1.2em;
       line-height: 1.5;
       color: #000;
     }
-
     a {
       color: #000;
       text-decoration: underline;
     }
-
     a:hover {
       color: #990000;
     }
-
     .blinking {
       animation: blink 1s infinite;
     }
-
     @keyframes blink {
       50% { opacity: 0; }
     }
-
     marquee {
       background-color: #FFCC99;
       padding: 10px;
       font-weight: bold;
       color: #000;
     }
-
     table {
       width: 100%;
       margin: 20px 0;
       border-collapse: collapse;
     }
-
-    td,
-    th {
+    td, th {
       border: 1px solid #663300;
       padding: 10px;
       text-align: center;
       color: #000;
     }
-
     .guestbook {
       margin-top: 20px;
     }
-
     .guestbook form {
       display: flex;
       flex-direction: column;
       width: 100%;
     }
-
     .guestbook input,
     .guestbook textarea {
       margin-bottom: 10px;
       padding: 5px;
       border: 1px solid #663300;
     }
-
     .construction {
       text-align: center;
       margin-top: 20px;
     }
-
     .midi-player {
       background-color: rgba(255, 255, 204, 0.9);
       padding: 15px;
@@ -174,21 +148,18 @@
       font-size: 1.5em;
       color: #000;
     }
-
     .hit-counter {
       text-align: center;
       font-size: 1.5em;
       margin-top: 20px;
       color: #000;
     }
-
     .gif-container {
       display: flex;
       flex-wrap: wrap;
       justify-content: space-around;
       margin-top: 20px;
     }
-
     .gif-section {
       margin-top: 40px;
       text-align: center;
@@ -196,17 +167,14 @@
       border: 3px solid #663300;
       padding: 10px;
     }
-
     .gif {
       width: 200px;
       height: 200px;
       margin: 10px;
     }
-
     .omnimon-core {
       margin-top: 40px;
     }
-
     footer {
       text-align: center;
       margin-top: 20px;
@@ -216,7 +184,6 @@
       font-size: 1.2em;
       color: #000;
     }
-
     .ad {
       display: none;
       position: fixed;
@@ -229,17 +196,14 @@
       z-index: 1000;
       text-align: center;
     }
-
     .ad img {
       width: 100px;
       height: auto;
     }
-
     .ad a {
       color: #000;
       text-decoration: none;
     }
-
     /* New styles for the GIF section in the middle */
     .gif-replace {
       background-color: rgba(0, 0, 0, 0.8);
@@ -248,12 +212,10 @@
       text-align: center;
       margin-top: 20px;
     }
-
     .gif-replace img {
       width: 300px;
       height: auto;
     }
-
     /* Styles for the Snake Game */
     .snake-game {
       text-align: center;
@@ -264,7 +226,6 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
       position: relative;
     }
-
     .snake-game .score-board {
       display: flex;
       justify-content: center;
@@ -273,12 +234,10 @@
       font-size: 1.2em;
       color: #fff;
     }
-
     #snakeCanvas {
       background-color: #000;
       border: 2px solid #663300;
     }
-
     /* Game Over Overlay */
     .game-over {
       position: absolute;
@@ -295,11 +254,9 @@
       font-size: 1.5em;
       display: none;
     }
-
     .game-over.active {
       display: flex;
     }
-
     .game-over button {
       margin-top: 20px;
       padding: 10px 20px;
@@ -310,11 +267,9 @@
       border-radius: 5px;
       font-size: 1em;
     }
-
     .game-over button:hover {
       background-color: #993300;
     }
-
     /* Ad Button */
     .ad-button {
       display: inline-block;
@@ -332,34 +287,25 @@
       position: relative;
       margin-top: 20px;
     }
-
     .ad-button:hover {
       transform: scale(1.1);
     }
-
     @keyframes glowing {
-      0% {
-        box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-      }
-      100% {
-        box-shadow: 0 0 20px rgba(255, 255, 255, 1);
-      }
+      0% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
+      100% { box-shadow: 0 0 20px rgba(255, 255, 255, 1); }
     }
-
     /* ===== Chat Sidebar Styles (Updated) ===== */
     .chat-sidebar {
       margin-top: 20px;
       padding-top: 10px;
       border-top: 2px solid #663300;
     }
-
     .chat-sidebar h3 {
       margin: 0 0 10px 0;
       font-size: 1.2em;
       text-align: center;
     }
-
-    /* New styling for the Utterances container to look fancier */
+    /* The utterances container is now fixed-height and scrollable */
     .chat-sidebar .utterances-container {
       border: 2px solid #663300;
       border-radius: 8px;
@@ -367,6 +313,24 @@
       background-color: rgba(255, 255, 204, 0.9);
       padding: 10px;
       margin-bottom: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    /* New button for scrolling down within the chat box */
+    .scroll-down-btn {
+      display: block;
+      width: 100%;
+      padding: 5px;
+      font-size: 1.2em;
+      cursor: pointer;
+      background-color: #663300;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      transition: background 0.2s;
+    }
+    .scroll-down-btn:hover {
+      background-color: #993300;
     }
   </style>
 </head>
@@ -396,10 +360,10 @@
         <li><a href="#">Link 5</a></li>
       </ul>
 
-      <!-- ===== Chat Interface Embedded in Sidebar (Custom Chat Box Removed) ===== -->
+      <!-- ===== Chat Interface Embedded in Sidebar ===== -->
       <div class="chat-sidebar">
         <h3>Live Chat</h3>
-        <!-- Only the default Utterances integration remains -->
+        <!-- Only the default Utterances integration remains inside a scrollable container -->
         <div class="utterances-container">
           <script
             src="https://utteranc.es/client.js"
@@ -408,9 +372,11 @@
             label="chat"
             theme="github-light"
             crossorigin="anonymous"
-            async
-          ></script>
+            async>
+          </script>
         </div>
+        <!-- Down-arrow button that scrolls only the chat box to its bottom -->
+        <button class="scroll-down-btn" onclick="scrollToChat()">&#x2193;</button>
         <!-- Button linking to the full chat page -->
         <button onclick="location.href='subpages/chat.html'" style="width: 100%; margin-top:10px; padding: 5px; font-size:0.9em;">
           Go to Chat Page
@@ -420,20 +386,17 @@
 
     <div class="main">
       <p>
-        What's up? This is my super cool website. I like to put stuff online
-        and share it with everyone. Take a look at these awesome links:
+        What's up? This is my super cool website. I like to put stuff online and share it with everyone.
+        Take a look at these awesome links:
       </p>
 
       <ul>
         <li><a href="https://www.askjeeves.com">Ask Jeeves!</a></li>
-        <li>
-          <a href="https://www.geocities.com/SunsetStrip/Palms/8314/">GeoCities</a>
-        </li>
+        <li><a href="https://www.geocities.com/SunsetStrip/Palms/8314/">GeoCities</a></li>
         <li><a href="https://www.angelfire.com">Angelfire</a></li>
       </ul>
 
       <p>Here's a rad table:</p>
-
       <table>
         <tr>
           <th>Favorite Bands</th>
@@ -474,31 +437,19 @@
       </div>
 
       <div class="construction">
-        <img
-          src="https://www.animatedimages.org/data/media/145/animated-construction-image-0017.gif"
-          alt="Under Construction"
-        />
+        <img src="https://www.animatedimages.org/data/media/145/animated-construction-image-0017.gif" alt="Under Construction" />
         <p>This site is under construction!</p>
       </div>
 
       <div class="midi-player">
         <h3>Listen to this cool MIDI music:</h3>
-        <embed
-          src="https://www.myinstants.com/media/sounds/midi-mario.mp3"
-          autostart="true"
-          loop="true"
-          width="200"
-          height="20"
-        />
+        <embed src="https://www.myinstants.com/media/sounds/midi-mario.mp3" autostart="true" loop="true" width="200" height="20" />
       </div>
 
       <div class="hit-counter">
         <p>
           You are visitor number
-          <img
-            src="https://www.easycounter.com/counter.php?jayretro"
-            alt="Hit Counter"
-          />
+          <img src="https://www.easycounter.com/counter.php?jayretro" alt="Hit Counter" />
         </p>
       </div>
     </div>
@@ -507,49 +458,21 @@
   <div class="gif-section">
     <h2>Awesome GIFs!</h2>
     <div class="gif-container">
-      <img
-        src="https://milnersblog.com/wp-content/uploads/2012/07/alien-3d-lenticular-animated-gif.gif"
-        class="gif"
-        alt="Alien GIF"
-      />
+      <img src="https://milnersblog.com/wp-content/uploads/2012/07/alien-3d-lenticular-animated-gif.gif" class="gif" alt="Alien GIF" />
       <p>Alien 3D GIF</p>
-      <img
-        src="https://64.media.tumblr.com/c7afc2c50ed9e85688f41ecd01cd66bb/506b3524aab785ba-a1/s500x750/245391ee0bac3e5a808859985fd5d9ab18300ff6.gif"
-        class="gif"
-        alt="GIF"
-      />
+      <img src="https://64.media.tumblr.com/c7afc2c50ed9e85688f41ecd01cd66bb/506b3524aab785ba-a1/s500x750/245391ee0bac3e5a808859985fd5d9ab18300ff6.gif" class="gif" alt="GIF" />
       <p>Cool Animated GIF</p>
-      <img
-        src="https://img.clipart-library.com/2/clip-alien-gif/clip-alien-gif-5.gif"
-        class="gif"
-        alt="Alien GIF"
-      />
+      <img src="https://img.clipart-library.com/2/clip-alien-gif/clip-alien-gif-5.gif" class="gif" alt="Alien GIF" />
       <p>Another Alien GIF</p>
       <img src="https://i.gifer.com/Xbmy.gif" class="gif" alt="GIF" />
       <p>Funny GIF</p>
-      <img
-        src="https://img1.picmix.com/output/stamp/thumb/7/8/1/1/1591187_d2920.gif"
-        class="gif"
-        alt="GIF"
-      />
+      <img src="https://img1.picmix.com/output/stamp/thumb/7/8/1/1/1591187_d2920.gif" class="gif" alt="GIF" />
       <p>Stamp GIF</p>
-      <img
-        src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1733170/extras/04.gif?t=1728068477"
-        class="gif"
-        alt="GIF"
-      />
+      <img src="https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1733170/extras/04.gif?t=1728068477" class="gif" alt="GIF" />
       <p>Steam GIF</p>
-      <img
-        src="https://media.tenor.com/Jn31WhiPpBYAAAAM/digimon-adventure.gif"
-        class="gif"
-        alt="Digimon GIF"
-      />
+      <img src="https://media.tenor.com/Jn31WhiPpBYAAAAM/digimon-adventure.gif" class="gif" alt="Digimon GIF" />
       <p>Digimon Adventure GIF</p>
-      <img
-        src="https://media.tenor.com/cg-dZ4x1P8kAAAAM/digimon-adventure-digimon.gif"
-        class="gif"
-        alt="Digimon GIF"
-      />
+      <img src="https://media.tenor.com/cg-dZ4x1P8kAAAAM/digimon-adventure-digimon.gif" class="gif" alt="Digimon GIF" />
       <p>Digimon Adventure Character GIF</p>
     </div>
   </div>
@@ -557,49 +480,21 @@
   <div class="omnimon-core gif-section">
     <h2>Omnimon Core!</h2>
     <div class="gif-container">
-      <img
-        src="https://64.media.tumblr.com/1b94518f62bda019b7a1a1d3f30e7802/ff52e35e4be9ae1d-76/s540x810/71a9e0f70ed5acc0919a987ced9f4c1a0c31715c.gif"
-        class="gif"
-        alt="Omnimon GIF"
-      />
+      <img src="https://64.media.tumblr.com/1b94518f62bda019b7a1a1d3f30e7802/ff52e35e4be9ae1d-76/s540x810/71a9e0f70ed5acc0919a987ced9f4c1a0c31715c.gif" class="gif" alt="Omnimon GIF" />
       <p>Omnimon GIF</p>
-      <img
-        src="https://lh3.googleusercontent.com/uVpGVAo7fbYRKBwfhGOsKrpU7CKQLfDPWDJZUGLxEJWWLGaqmfjMWOBIuWT9oEwzIBGD1BYbfhsfK6Ax12EmRbA4h8Bqz3HY9j6-NiHjdLe4Ma8KqllJawtnAmxONoIOPnBAxQm1sobO_2c2LvjSi8i5yjSRJjD9DC-1Nc90lljoGKI_pKsUfWTzmJCKNw"
-        class="gif"
-        alt="Omnimon GIF"
-      />
+      <img src="https://lh3.googleusercontent.com/uVpGVAo7fbYRKBwfhGOsKrpU7CKQLfDPWDJZUGLxEJWWLGaqmfjMWOBIuWT9oEwzIBGD1BYbfhsfK6Ax12EmRbA4h8Bqz3HY9j6-NiHjdLe4Ma8KqllJawtnAmxONoIOPnBAxQm1sobO_2c2LvjSi8i5yjSRJjD9DC-1Nc90lljoGKI_pKsUfWTzmJCKNw" class="gif" alt="Omnimon GIF" />
       <p>Powerful Omnimon GIF</p>
-      <img
-        src="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/653ab876-d70e-406f-8d7f-3aea70ea2221/da37vxl-e2535ec6-4a2d-45b7-93d8-d7d3acd8eb39.gif?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzY1M2FiODc2LWQ3MGUtNDA2Zi04ZDdmLTNhZWE3MGVhMjIyMVwvZGEzN3Z4bC1lMjUzNWVjNi00YTJkLTQ1YjctOTNkOC1kN2QzYWNkOGViMzkuZ2lmIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.qN5B-qcLZ_NDY-Wtr5liNoV3NLYc3UOsXEQ8dyPLog0"
-        class="gif"
-        alt="Omnimon GIF"
-      />
+      <img src="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/653ab876-d70e-406f-8d7f-3aea70ea2221/da37vxl-e2535ec6-4a2d-45b7-93d8-d7d3acd8eb39.gif?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzY1M2FiODc2LWQ3MGUtNDA2Zi04ZDdmLTNhZWE3MGVhMjIyMVwvZGEzN3Z4bC1lMjUzNWVjNi00YTJkLTQ1YjctOTNkOC1kN2QzYWNkOGViMzkuZ2lmIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.qN5B-qcLZ_NDY-Wtr5liNoV3NLYc3UOsXEQ8dyPLog0" class="gif" alt="Omnimon GIF" />
       <p>Epic Battle Omnimon GIF</p>
-      <img
-        src="https://31.media.tumblr.com/077850a0185cd204d435e8d9db9c581e/tumblr_n6pt1oFrWa1t0zxm0o7_400.gif"
-        class="gif"
-        alt="Omnimon GIF"
-      />
+      <img src="https://31.media.tumblr.com/077850a0185cd204d435e8d9db9c581e/tumblr_n6pt1oFrWa1t0zxm0o7_400.gif" class="gif" alt="Omnimon GIF" />
       <p>Omnimon Action GIF</p>
-      <img
-        src="https://media.tenor.com/mvyOJBQOW0oAAAAM/digimon-adventure.gif"
-        class="gif"
-        alt="Omnimon GIF"
-      />
+      <img src="https://media.tenor.com/mvyOJBQOW0oAAAAM/digimon-adventure.gif" class="gif" alt="Omnimon GIF" />
       <p>Classic Digimon GIF</p>
-      <img
-        src="https://media.tenor.com/xgQ-T2IwVQEAAAAM/omnimon-power.gif"
-        class="gif"
-        alt="Omnimon GIF"
-      />
+      <img src="https://media.tenor.com/xgQ-T2IwVQEAAAAM/omnimon-power.gif" class="gif" alt="Omnimon GIF" />
       <p>Omnimon Power GIF</p>
       <img src="https://i.imgur.com/9YaA1Ah.gif" class="gif" alt="Omnimon GIF" />
       <p>Omnimon Transformation GIF</p>
-      <img
-        src="https://comicvine.gamespot.com/a/uploads/original/11130/111301681/7883173-altdelete.gif"
-        class="gif"
-        alt="Omnimon GIF"
-      />
+      <img src="https://comicvine.gamespot.com/a/uploads/original/11130/111301681/7883173-altdelete.gif" class="gif" alt="Omnimon GIF" />
       <p>Omnimon Alt GIF</p>
     </div>
   </div>
@@ -624,10 +519,7 @@
   <div class="ad" id="ad">
     <a href="spore.html">
       <img src="https://i.gifer.com/4jwo.gif" alt="Ad GIF" style="width: 100px; height: auto;" />
-      <p>
-        🌟 Don't miss out on our special offer! Click here for a surprise!
-        🌟
-      </p>
+      <p>🌟 Don't miss out on our special offer! Click here for a surprise! 🌟</p>
     </a>
   </div>
 
@@ -644,14 +536,38 @@
     <p>Check out our latest updates on our blog!</p>
   </footer>
 
-  <!-- (Removed the custom chat script since the custom chat box is no longer used) -->
+  <!-- Scroll-to-Bottom Script for the Chat Box -->
+  <script>
+    function scrollToChat() {
+      // Scroll only the utterances container (chat box) to the bottom
+      const chatContainer = document.querySelector('.chat-sidebar .utterances-container');
+      if (chatContainer) {
+        chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+      }
+    }
+    
+    // Optional: Auto-scroll the utterances container to the bottom when the iframe loads
+    const utterancesContainer = document.querySelector('.chat-sidebar .utterances-container');
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeName === 'IFRAME') {
+            node.addEventListener('load', () => {
+              utterancesContainer.scrollTop = utterancesContainer.scrollHeight;
+            });
+          }
+        });
+      });
+    });
+    observer.observe(utterancesContainer, { childList: true });
+  </script>
 
   <!-- Existing Scripts (Ad & Snake Game) -->
   <script>
     // Advertisement Script
     function showAd() {
       const ad = document.getElementById("ad");
-      const shouldShow = Math.random() < 0.5; // 50% chance to show ad
+      const shouldShow = Math.random() < 0.5;
       ad.style.display = shouldShow ? "block" : "none";
     }
     setInterval(showAd, 10000);
@@ -685,14 +601,11 @@
       for (let i = 0; i < number; i++) {
         let obstacle;
         do {
-          obstacle = {
-            x: getRandomInt(0, 20) * grid,
-            y: getRandomInt(0, 20) * grid,
-          };
+          obstacle = { x: getRandomInt(0, 20) * grid, y: getRandomInt(0, 20) * grid };
         } while (
           (obstacle.x === apple.x && obstacle.y === apple.y) ||
           (obstacle.x === snake.x && obstacle.y === snake.y) ||
-          obstacles.some((obs) => obs.x === obstacle.x && obs.y === obstacle.y)
+          obstacles.some(obs => obs.x === obstacle.x && obs.y === obstacle.y)
         );
         obstacles.push(obstacle);
       }
@@ -706,92 +619,57 @@
 
     function gameLoop() {
       requestAnimationFrame(gameLoop);
-
-      if (++count < speed) {
-        return;
-      }
+      if (++count < speed) return;
       count = 0;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       ctx.fillStyle = "gray";
-      obstacles.forEach((obstacle) => {
+      obstacles.forEach(obstacle => {
         ctx.fillRect(obstacle.x, obstacle.y, grid - 1, grid - 1);
       });
-
       ctx.fillStyle = "red";
       ctx.fillRect(apple.x, apple.y, grid - 1, grid - 1);
-
       snake.x += snake.dx;
       snake.y += snake.dy;
-
-      if (snake.x < 0) {
-        snake.x = canvas.width - grid;
-      } else if (snake.x >= canvas.width) {
-        snake.x = 0;
-      }
-
-      if (snake.y < 0) {
-        snake.y = canvas.height - grid;
-      } else if (snake.y >= canvas.height) {
-        snake.y = 0;
-      }
-
+      if (snake.x < 0) snake.x = canvas.width - grid;
+      else if (snake.x >= canvas.width) snake.x = 0;
+      if (snake.y < 0) snake.y = canvas.height - grid;
+      else if (snake.y >= canvas.height) snake.y = 0;
       snake.cells.unshift({ x: snake.x, y: snake.y });
-
-      if (snake.cells.length > snake.maxCells) {
-        snake.cells.pop();
-      }
-
+      if (snake.cells.length > snake.maxCells) snake.cells.pop();
       ctx.fillStyle = "green";
       snake.cells.forEach((cell, index) => {
         ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
-
         if (cell.x === apple.x && cell.y === apple.y) {
           snake.maxCells++;
           score++;
           scoreElement.textContent = score;
-
           if (score > highScore) {
             highScore = score;
             highScoreElement.textContent = highScore;
             localStorage.setItem("highScore", highScore);
           }
-
           let newApple;
           do {
             newApple = { x: getRandomInt(0, 20) * grid, y: getRandomInt(0, 20) * grid };
           } while (isOccupied(newApple.x, newApple.y));
           apple = newApple;
-
-          if (score % 5 === 0) {
-            generateObstacles(1);
-          }
+          if (score % 5 === 0) generateObstacles(1);
         }
-
         for (let i = index + 1; i < snake.cells.length; i++) {
-          if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-            endGame();
-          }
+          if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) endGame();
         }
-
-        obstacles.forEach((obstacle) => {
-          if (cell.x === obstacle.x && cell.y === obstacle.y) {
-            endGame();
-          }
+        obstacles.forEach(obstacle => {
+          if (cell.x === obstacle.x && cell.y === obstacle.y) endGame();
         });
       });
     }
 
     function isOccupied(x, y) {
       for (let cell of snake.cells) {
-        if (cell.x === x && cell.y === y) {
-          return true;
-        }
+        if (cell.x === x && cell.y === cell.y) return true;
       }
       for (let obstacle of obstacles) {
-        if (obstacle.x === x && obstacle.y === y) {
-          return true;
-        }
+        if (obstacle.x === x && obstacle.y === obstacle.y) return true;
       }
       return false;
     }
@@ -819,20 +697,11 @@
       requestAnimationFrame(gameLoop);
     }
 
-    document.addEventListener("keydown", function (e) {
-      if (e.which === 37 && snake.dx === 0) {
-        snake.dx = -grid;
-        snake.dy = 0;
-      } else if (e.which === 38 && snake.dy === 0) {
-        snake.dy = -grid;
-        snake.dx = 0;
-      } else if (e.which === 39 && snake.dx === 0) {
-        snake.dx = grid;
-        snake.dy = 0;
-      } else if (e.which === 40 && snake.dy === 0) {
-        snake.dy = grid;
-        snake.dx = 0;
-      }
+    document.addEventListener("keydown", function(e) {
+      if (e.which === 37 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
+      else if (e.which === 38 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+      else if (e.which === 39 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
+      else if (e.which === 40 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; }
     });
 
     requestAnimationFrame(gameLoop);
