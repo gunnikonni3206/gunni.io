@@ -1,268 +1,511 @@
 <!DOCTYPE html>
 <html>
 <head>
- <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
- <title>SURVIVOR (1982 Commodore 64 game remake)</title>
- <meta name="description" content="A playable HTML + CSS + JavaScript remake of a space-based &quot;shoot-'em-up&quot; arcade game, including a level editor and design tool. Written as a prototype / demo of JavaScript and browser capabilities. Original Atari 2600 game by Richard Carr, (C) 1982 Synapse Software. Created for the C64 by Ewing Soft (1983.)" />
- <meta name="keywords" content="Survivor, JavaScript, HTML, DHTML, animation, CSS3, arcade, retro, space, shooter, arcade game, browser game, commodore 64" />
- <meta name="author" content="Scott Schiller" />
- <!--
- /** @license
-  *
-  * SURVIVOR: A HTML + CSS + JavaScript prototype
-  * based on the Commodore 64 version of Survivor from 1983
-  *
-  * http://schillmania.com/survivor/
-  * http://www.schillmania.com/content/entries/2012/survivor-c64-html-remake/
-  * http://www.flickr.com/photos/schill/sets/72157628885315581/
-  * https://github.com/scottschiller/SURVIVOR
-  *
-  * Scott Schiller wrote this beginning in December 2011, while on a plane to Hawaii.
-  * Code provided under the Attribution-NonCommercial 3.0 Unported (CC BY-NC 3.0) License:
-  * http://creativecommons.org/licenses/by-nc/3.0/
-  *
-  */
-
-  /**
-   * ADDITIONAL PAGE DEBUG OPTIONS / PARAMETERS
-   * ?html5audio=1 - prefer HTML5 audio, if available (at own risk)
-   * ?profile=1 - shows a performance panel with live DOM stats, options to show/hide groups of DOM elements
-   * ?debug=1 - green blocks everywhere on the grid.
-   * ?mute=1 - I hate sound
-   * ?interval=1 - force setInterval() instead of requestAnimationFrame (if available)
-   */
- -->
- <link rel="stylesheet" href="css/survivor.css" />
- <!-- see script/soundmanager2.js for full, commented version -->
- <script src="script/soundmanager2-nodebug-jsmin.js"></script>
- <script src="script/survivor.js"></script>
- <!-- on schillmania.com -->
- <script src="/common/stats.js"></script>
+  <meta charset="UTF-8">
+  <title>Retro Runner Enhanced</title>
+  <style>
+    /* Basic reset and retro styling */
+    body {
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Press Start 2P', cursive;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: #111;
+      image-rendering: pixelated;
+    }
+    /* Import a retro font */
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    /* Style for the Back button */
+    #backButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 12px;
+      padding: 8px 12px;
+      background: #222;
+      border: 2px solid #fff;
+      color: #fff;
+      cursor: pointer;
+      z-index: 10;
+    }
+    #backButton:hover {
+      background: #333;
+    }
+  </style>
 </head>
-
 <body>
-
-<div>
-
-<div id="screens">
-
- <ul id="screen-list">
-
-  <li id="boot-screen">
-
-   <div id="c64">
-
-    <div id="c64-body">
-
-     <h1>**** COMMODORE 64 BASIC V2 ****</h1>
-  
-     <h2>64K RAM SYSTEM&nbsp;&nbsp;38911 BASIC BYTES FREE</h2>
-
-     <p>READY.<p>
-
-     <div id="loading0" class="loading">
-
-      <p>LOAD"SURVIVOR-2012",8,1</p>
-
-      <br />
-
-     </div>
-
-     <p id="loading1" class="loading">SEARCHING FOR SURVIVOR-2012</p>
-
-     <p id="loading2" class="loading">LOADING</p>
-
-     <div id="go_go_go">
-
-      <p>READY.</p>
-
-      <p>RUN</p>
-
-     </div>
-
-    </div>
-
-    <div id="cursor"></div>
-
-   </div>
-
-  </li>
-
-  <li id="title-screen">
-
-   <div id="title-content">
-
-    <div id="title-header">
-
-     <h1>SURVIVOR 2012</h1>
-
-    </div>
-
-    <h2>A HTML + CSS + JavaScript prototype, based on the Commodore 64 version of Survivor from 1983.</h2>
-
-    <h3>
-     <!-- <marquee> has been outlawed and deprecated for a while, now. We'll do evil things with CSS, to mimic it. -->
-     <span class="marquee">
-      <span class="marquee-text">Original Atari 2600 game by Richard Carr, (C) 1982 Synapse Software. Created for the C64 by Ewing Soft (1983.)</span>
-     </span>
-    </h3>
-
-   </div>
-
-  </li>
-
-  <li id="help-screen">
-
-   <div class="c64 bd">
-    <div class="wrapper">
-
-     <p>It's 1982, and you're playing an arcade game. Of course it has a space theme -- it's 1982. Your mission: Destroy everything you can.</p>
-
-     <h3>CONTROLS</h3>
-
-     <p>Arrow keys drive the ship. SHIFT or CTRL can be used to fire (for the fastest firing rate, hold the key down.) Use the SPACE BAR to fire "smartbombs", which will kill any bad guys that happen to be chasing you.</p>
-
-     <h3>HOW TO PLAY</h3>
-
-     <p>The goal: Destroy the bases by shooting out the turrets attached to them. When all turrets are dead on a base, it will explode. When all bases are dead, you will pass the level.</p>
-
-     <p>Avoid crashing into "spaceballs" (green asteroid slimeball-like things), and shoot or steer clear of "bad guys" that will occasionally appear and chase you. As you destroy each, the speed of the game will increase slightly.</p>
-
-     <h3>ABOUT</h3>
-
-     <p>SURVIVOR was originally written for the Atari 2600 home arcade game system in 1982, and was ported in 1983 to the popular Commodore 64 computer system. This is a browser-based remake, written in 2012, that is a tribute to the spirit of the Commodore 64 version. It is a browser-based prototype demonstrating (and admittedly, ironically,) how HTML + CSS + JavaScript can be used to emulate games designed for hardware that existed thirty years prior.</p>
-
-    </div>
-   </div>
-
-  </li>
-
-  <li id="level-end-sequence">
-    <!-- generated explosion elements end up here -->
-  </li>
-
-  <li id="level-passed-screen">
-
-   <div class="c64 bd">
-    <div class="wrapper">
-     <p style="text-align:center">*** LEVEL PASSED ***</p>
-     <br />
-     <p>This is the part where the game would say "level 2" and you would then get to replay the same scene, but with everything sped up -- since it was 1982, this was a way to make games increasingly difficult at the time.</p>
-     <p>Your mission, should you accept it: Repeat the level you just passed, but with everything moving around you 25% faster.</p>
-     <p>Thanks for playing!</p>
-     <div id="level-passed-stats"></div>
-    </div>
-   </div>
-
-  </li>
-
-  <li id="game-over-screen">
-
-   <div class="c64 bd">
-     <p>"Game over man, game over!"</p>
-     <div id="game-over-stats">
-       <!-- scores, stats and crap go here -->
-     </div>
-   </div>
-
-  </li>
-
- </ul>
-
-</div>
-
-<div id="world-container">
-
- <div id="world">
-    <!-- blocks, walls, bases and turrets end up here -->
- </div>
-
- <div id="footer">
-
-  <div id="debug-panel">
-
-   <div class="debug-header">Debug options</div>
-
-    <form id="debug-form" action="." method="post" onsubmit="return false">
-
-     <ul class="compact">
-
-      <li><input id="disable-pulse" type="checkbox" /> <label for="disable-pulse">world pulse effect</label></li>
-      <li><input id="hide-block" type="checkbox" /> <label for="hide-block">blocks</label></li>
-      <li><input id="hide-wall" type="checkbox" /> <label for="hide-wall">walls</label></li>
-      <li><input id="hide-spaceball" type="checkbox" /> <label for="hide-spaceball">spaceballs</label></li>
-      <li><input id="hide-turret-gunfire" type="checkbox" /> <label for="hide-turret-gunfire">turret gunfire</label></li>
-      <li><input id="hide-turret" type="checkbox" /> <label for="hide-turret">turrets</label></li>
-      <li><input id="hide-bad-guy" type="checkbox" /> <label for="hide-bad-guy">bad guys</label></li>
-      <li><input id="hide-ship" type="checkbox" /> <label for="hide-ship">ship</label></li>
-      <li><input id="hide-ship-gunfire" type="checkbox" /> <label for="hide-ship-gunfire">ship gunfire</label></li>
-      <li><input id="disable-sprites" type="checkbox" /> <label for="disable-sprites">sprites</label></li>
-      <li><input id="disable-css3" type="checkbox" /> <label for="disable-css3">CSS3 effects</label></li>
-
-     </ul>
-
-     <div class="debug-header">DOM stats</div>
-
-      <ul>
-
-       <li><code title="number of these elements in #world">#world &lt;div&gt;</code>: <span id="debug-div-count" class="count">0</span></li>
-       <li><code title="number of these elements in #world">#world &lt;div&gt;.block</code>: <span id="debug-div-block-count" class="count">0</span></li>
-       <li><code title="number of these elements in #world">#world &lt;div&gt;.wall</code>: <span id="debug-div-wall-count" class="count">0</span></li>
-       <li><code title="number of these elements in #world">#world &lt;div&gt;.turret</code>: <span id="debug-div-turret-count" class="count">0</span></li>
-
-      </ul>
-
-      <div class="debug-header">Moving objects in view</div>
-
-       <ul>
-
-        <li><span title="number of active turret fire elements">turret gunfire</span>: <span id="debug-turret-fire-count" class="count">0</span></li>
-        <li><span title="number of active spaceballs">spaceballs</span>: <span id="debug-spaceball-count" class="count">0</span></li>
-        <li><span title="number of active bad guys">bad guys</span>: <span id="debug-badguy-count" class="count">0</span></li>
-
-       </ul>
-
-      </form>
-
-     </div>
-
-     <div id="stats">
-      <a id="help" href="#help" onclick="return false" title="Help, keyboard controls and about the game" class="cta help">?</a>
-      <span class="divider">|</span>
-      <a href="http://www.schillmania.com/content/entries/2012/survivor-c64-html-remake/" title="Making-of, development notes, screenshots and background info">More &raquo;</a>
-      <span class="divider">|</span>
-      fps: <span id="fps">N/A</span>
-     </div>
-
-     <div id="game-state">
-      <!-- lives, score, smartbombs etc. -->
-      <a id="remix" href="editor.html" title="Create your own level with blocks, walls and turrets" class="cta">Create a level</a>
-      <span class="divider">|</span>
-      <span id="original">
-       <span id="tweeter">
-        <a href="#" title="Looks like you designed something. Challenge your friends to beat it!" onclick="return false" class="cta tweeter">twitter</a>
-        <span class="divider">|</span>
-       </span>
-       <a href="./" title="Play the default level from the original game">Play the original level</a>
-       <span class="divider">|</span> 
-      </span>
-      Score: <span id="points">0</span>
-      <span class="divider">|</span> 
-      Lives: <span id="lives">0</span>
-      <span class="divider">|</span>
-      Smartbombs: <span id="smartbombs">0</span>
-      <span class="divider">|</span>
-      Background music: <a href="http://www.youtube.com/watch?v=btPJPFnesV4&amp;list=PLBAB23D461827111C" rel="nofollow" title="Popular songs from 1982 and 1983, when the original 'Survivor' game was released." target="yt_survivor">arcade era</a> (1982-83) / <a href="http://www.youtube.com/watch?v=PWcaPIOiD_0&amp;list=PLB4B5B0B78FB29258" rel="nofollow" title="A few random songs, not limited to 80's hits." target="yt_survivor">modern</a> (2012)
-    </div>
-
-   </div>
-
-   <noscript>Don't forget to enable JavaScript.</noscript>
-
-  </div>
-
-</div>
-
+  <!-- Back button to go to games.html -->
+  <button id="backButton" onclick="window.location.href='games.html'">Back</button>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <script>
+    /**************************************
+     * Retro Runner Enhanced
+     * A retro endless runner with obstacles, coins, power-ups,
+     * flying enemies, sliding, and sound effects.
+     **************************************/
+
+    // Get canvas and context
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const CANVAS_WIDTH = canvas.width;
+    const CANVAS_HEIGHT = canvas.height;
+
+    // Audio setup (replace the source URLs with your own files if needed)
+    const jumpSound = new Audio('jump.mp3');
+    const coinSound = new Audio('coin.mp3');
+    const powerupSound = new Audio('powerup.mp3');
+    const gameOverSound = new Audio('gameover.mp3');
+    const bgMusic = new Audio('background.mp3');
+    bgMusic.loop = true;
+
+    // Global game variables
+    let gameSpeed = 4;
+    let spawnTimer = 0;
+    let spawnInterval = 1500; // milliseconds between spawns
+    let lastTime = 0;
+    let gameTime = 0; // Accumulated time (for sine wave movement)
+    let obstacles = []; // Array holding obstacles, coins, power-ups, flying enemies
+    let score = 0;
+    let highScore = localStorage.getItem('retroRunnerHighScore') || 0;
+    let gameState = 'start'; // 'start', 'playing', or 'gameover'
+
+    // Player object with additional properties for sliding and score multiplier
+    const player = {
+      x: 50,
+      y: CANVAS_HEIGHT - 70, // starting on the ground
+      width: 50,
+      height: 50,
+      vy: 0,
+      gravity: 0.6,
+      jumpForce: -12,
+      isJumping: false,
+      isSliding: false,
+      invincible: false,
+      invincibleTimer: 0,
+      scoreMultiplier: 1,
+      multiplierTimer: 0,
+      color: '#0f0'
+    };
+
+    // Ground settings
+    const groundHeight = 20;
+
+    // Starry background for a retro look
+    let stars = [];
+    function initStars() {
+      stars = [];
+      for (let i = 0; i < 50; i++) {
+        stars.push({
+          x: Math.random() * CANVAS_WIDTH,
+          y: Math.random() * (CANVAS_HEIGHT - groundHeight),
+          radius: Math.random() * 1.5,
+          alpha: Math.random()
+        });
+      }
+    }
+    function drawStars() {
+      stars.forEach(star => {
+        ctx.fillStyle = 'rgba(255,255,255,' + star.alpha + ')';
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // Parallax mountains background (improves visual depth)
+    let mountainOffset = 0;
+    function drawMountains() {
+      ctx.fillStyle = "#444"; // dark gray mountains
+      const mountainWidth = 200;
+      mountainOffset += gameSpeed * 0.2;
+      if (mountainOffset > mountainWidth) {
+        mountainOffset = 0;
+      }
+      for (let i = -1; i < Math.ceil(CANVAS_WIDTH / mountainWidth); i++) {
+        let baseX = i * mountainWidth - mountainOffset;
+        ctx.beginPath();
+        ctx.moveTo(baseX, CANVAS_HEIGHT - groundHeight);
+        ctx.lineTo(baseX + mountainWidth / 2, CANVAS_HEIGHT - groundHeight - 100);
+        ctx.lineTo(baseX + mountainWidth, CANVAS_HEIGHT - groundHeight);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Keyboard handling
+    const keys = {};
+    document.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (gameState === 'start' && e.code === 'Space') {
+        startGame();
+      } else if (gameState === 'gameover' && e.code === 'KeyR') {
+        restartGame();
+      } else if (gameState === 'playing') {
+        if (e.code === 'Space') {
+          jump();
+        }
+        if (e.code === 'ArrowDown' && !player.isJumping && !player.isSliding) {
+          slide();
+        }
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+      if (e.code === 'ArrowDown' && player.isSliding) {
+        standUp();
+      }
+    });
+
+    // Start the game
+    function startGame() {
+      gameState = 'playing';
+      lastTime = performance.now();
+      gameTime = 0;
+      spawnTimer = 0;
+      obstacles = [];
+      score = 0;
+      gameSpeed = 4;
+      // Reset player state
+      player.y = CANVAS_HEIGHT - player.height - groundHeight;
+      player.vy = 0;
+      player.isJumping = false;
+      player.isSliding = false;
+      player.invincible = false;
+      player.invincibleTimer = 0;
+      player.scoreMultiplier = 1;
+      player.multiplierTimer = 0;
+      // Start background music
+      bgMusic.currentTime = 0;
+      bgMusic.play();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Restart after game over
+    function restartGame() {
+      gameState = 'start';
+      bgMusic.pause();
+      spawnInterval = 1500;
+      drawStartScreen();
+    }
+
+    // Player jump function
+    function jump() {
+      if (!player.isJumping && !player.isSliding) {
+        player.vy = player.jumpForce;
+        player.isJumping = true;
+        jumpSound.currentTime = 0;
+        jumpSound.play();
+      }
+    }
+
+    // Player slide functions
+    function slide() {
+      if (!player.isJumping && !player.isSliding) {
+        player.isSliding = true;
+        // Reduce the player's height to simulate a slide.
+        player.height = 30;
+        player.y = CANVAS_HEIGHT - groundHeight - player.height;
+      }
+    }
+    function standUp() {
+      if (player.isSliding) {
+        player.isSliding = false;
+        player.height = 50;
+        player.y = CANVAS_HEIGHT - groundHeight - player.height;
+      }
+    }
+
+    // Create a new obstacle/coin/power-up/flying enemy
+    function createObstacle() {
+      let rand = Math.random();
+      if (rand < 0.70) {
+        // Normal obstacle (red rectangle)
+        const width = 20 + Math.random() * 30;
+        const height = 20 + Math.random() * 30;
+        obstacles.push({
+          type: 'obstacle',
+          x: CANVAS_WIDTH,
+          y: CANVAS_HEIGHT - groundHeight - height,
+          width: width,
+          height: height,
+          color: '#f00'
+        });
+      } else if (rand < 0.85) {
+        // Coin (yellow circle)
+        const size = 15;
+        obstacles.push({
+          type: 'coin',
+          x: CANVAS_WIDTH,
+          y: CANVAS_HEIGHT - groundHeight - player.height - 60,
+          width: size,
+          height: size,
+          color: '#ff0'
+        });
+      } else if (rand < 0.93) {
+        // Flying enemy (purple rectangle with sine-wave vertical motion)
+        const width = 40;
+        const height = 40;
+        const baseY = CANVAS_HEIGHT - groundHeight - player.height - 120;
+        obstacles.push({
+          type: 'flying',
+          x: CANVAS_WIDTH,
+          baseY: baseY,
+          y: baseY,
+          width: width,
+          height: height,
+          color: '#a0f',
+          amplitude: 20,
+          phase: Math.random() * Math.PI * 2
+        });
+      } else if (rand < 0.97) {
+        // Power-up: Invincibility (cyan square)
+        const size = 20;
+        obstacles.push({
+          type: 'powerup',
+          power: 'invincibility',
+          x: CANVAS_WIDTH,
+          y: CANVAS_HEIGHT - groundHeight - player.height - 60,
+          width: size,
+          height: size,
+          color: '#0ff'
+        });
+      } else {
+        // Power-up: Score Multiplier (magenta square)
+        const size = 20;
+        obstacles.push({
+          type: 'powerup',
+          power: 'multiplier',
+          x: CANVAS_WIDTH,
+          y: CANVAS_HEIGHT - groundHeight - player.height - 60,
+          width: size,
+          height: size,
+          color: '#f0f'
+        });
+      }
+    }
+
+    // Update game objects
+    function update(deltaTime) {
+      gameTime += deltaTime;
+
+      // Update the player's vertical movement (gravity)
+      player.vy += player.gravity;
+      player.y += player.vy;
+      if (player.y + player.height >= CANVAS_HEIGHT - groundHeight) {
+        player.y = CANVAS_HEIGHT - groundHeight - player.height;
+        player.vy = 0;
+        player.isJumping = false;
+      }
+
+      // Update invincibility timer
+      if (player.invincible) {
+        player.invincibleTimer -= deltaTime;
+        if (player.invincibleTimer <= 0) {
+          player.invincible = false;
+          player.color = '#0f0';  // revert to normal color
+        }
+      }
+      // Update score multiplier timer
+      if (player.scoreMultiplier > 1) {
+        player.multiplierTimer -= deltaTime;
+        if (player.multiplierTimer <= 0) {
+          player.scoreMultiplier = 1;
+          player.multiplierTimer = 0;
+        }
+      }
+
+      // Update obstacles and check collisions
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        let ob = obstacles[i];
+        ob.x -= gameSpeed;
+
+        // Special update for flying enemy: sine-wave vertical motion
+        if (ob.type === 'flying') {
+          ob.y = ob.baseY + Math.sin(gameTime / 500 + ob.phase) * ob.amplitude;
+        }
+
+        // Remove obstacles that have gone off screen
+        if (ob.x + ob.width < 0) {
+          obstacles.splice(i, 1);
+          continue;
+        }
+
+        // Check collision between player and obstacle/item
+        if (collides(player, ob)) {
+          if (ob.type === 'obstacle' || ob.type === 'flying') {
+            if (!player.invincible) {
+              gameOver();
+              return;
+            }
+          } else if (ob.type === 'coin') {
+            score += 10 * player.scoreMultiplier;
+            coinSound.currentTime = 0;
+            coinSound.play();
+            obstacles.splice(i, 1);
+            continue;
+          } else if (ob.type === 'powerup') {
+            powerupSound.currentTime = 0;
+            powerupSound.play();
+            if (ob.power === 'invincibility') {
+              player.invincible = true;
+              player.invincibleTimer = 3000; // 3 seconds
+              player.color = '#ff0'; // change color to indicate invincibility
+            } else if (ob.power === 'multiplier') {
+              player.scoreMultiplier = 2;
+              player.multiplierTimer = 5000; // 5 seconds
+            }
+            obstacles.splice(i, 1);
+            continue;
+          }
+        }
+      }
+
+      // Increase score over time (multiplied by active multiplier)
+      score += deltaTime * 0.01 * player.scoreMultiplier;
+
+      // Gradually increase game speed for added difficulty
+      gameSpeed += deltaTime * 0.0001;
+
+      // Handle spawning new obstacles/items
+      spawnTimer += deltaTime;
+      if (spawnTimer > spawnInterval) {
+        createObstacle();
+        spawnTimer = 0;
+        // Optionally decrease spawnInterval (with a lower limit)
+        spawnInterval = Math.max(800, spawnInterval - 10);
+      }
+    }
+
+    // Simple rectangle collision detection
+    function collides(rect1, rect2) {
+      return rect1.x < rect2.x + rect2.width &&
+             rect1.x + rect1.width > rect2.x &&
+             rect1.y < rect2.y + rect2.height &&
+             rect1.y + rect1.height > rect2.y;
+    }
+
+    // Called when a collision with an obstacle occurs
+    function gameOver() {
+      gameState = 'gameover';
+      bgMusic.pause();
+      gameOverSound.currentTime = 0;
+      gameOverSound.play();
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('retroRunnerHighScore', highScore);
+      }
+      drawGameOverScreen();
+    }
+
+    // Draw the game state
+    function draw() {
+      // Clear the canvas
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Draw starry background
+      drawStars();
+
+      // Draw parallax mountains
+      drawMountains();
+
+      // Draw the ground
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, CANVAS_HEIGHT - groundHeight, CANVAS_WIDTH, groundHeight);
+
+      // Draw the player
+      // If invincible, draw a glowing aura
+      if (player.invincible) {
+        ctx.fillStyle = 'rgba(255,255,0,0.3)';
+        ctx.beginPath();
+        ctx.arc(player.x + player.width/2, player.y + player.height/2, player.width, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      // Draw obstacles and items
+      obstacles.forEach(ob => {
+        if (ob.type === 'coin') {
+          // Draw coin as a circle
+          ctx.fillStyle = ob.color;
+          ctx.beginPath();
+          ctx.arc(ob.x + ob.width / 2, ob.y + ob.height / 2, ob.width / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Draw obstacles, flying enemies, and power-ups as rectangles
+          ctx.fillStyle = ob.color;
+          ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+        }
+      });
+
+      // Draw the score and high score
+      ctx.fillStyle = '#fff';
+      ctx.font = '20px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('Score: ' + Math.floor(score), 10, 30);
+      ctx.fillText('High: ' + Math.floor(highScore), 10, 55);
+
+      // Display active score multiplier if greater than 1
+      if (player.scoreMultiplier > 1) {
+        ctx.fillStyle = '#f0f';
+        ctx.font = '16px monospace';
+        ctx.fillText('x' + player.scoreMultiplier + ' Score!', 10, 80);
+      }
+    }
+
+    // Main game loop using requestAnimationFrame
+    function gameLoop(timestamp) {
+      if (!lastTime) lastTime = timestamp;
+      const deltaTime = timestamp - lastTime;
+      lastTime = timestamp;
+
+      if (gameState === 'playing') {
+        update(deltaTime);
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // Draw the start screen with instructions
+    function drawStartScreen() {
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '30px monospace';
+      ctx.fillText('RETRO RUNNER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40);
+      ctx.font = '20px monospace';
+      ctx.fillText('Press SPACE to Start', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      ctx.fillText('Jump (SPACE) | Slide (↓)', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
+      ctx.fillText('Avoid obstacles, collect coins', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60);
+      ctx.fillText('and power-ups for boosts!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 90);
+    }
+
+    // Draw the game over screen
+    function drawGameOverScreen() {
+      // Draw the final game state in the background
+      draw();
+      // Overlay game over text
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '30px monospace';
+      ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+      ctx.font = '20px monospace';
+      ctx.fillText('Score: ' + Math.floor(score), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 10);
+      ctx.fillText('Press R to Restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 40);
+    }
+
+    // Initialize stars and show the start screen
+    initStars();
+    drawStartScreen();
+  </script>
 </body>
-
 </html>
