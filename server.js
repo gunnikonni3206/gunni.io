@@ -1,40 +1,32 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const fs = require('fs');
-const cors = require('cors');
-
+const path = require('path');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = 3000;
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
+// Middleware to parse JSON bodies
+app.use(express.json());
 
-// Route to handle guestbook submissions
-app.post('/submit', (req, res) => {
-  const { name, message } = req.body;
-  
-  if (!name || !message) {
-    return res.status(400).json({ error: 'Name and message are required.' });
+// Define the absolute path to your chat file
+const chatFilePath = 'C:\\Users\\Gunnar\\Desktop\\sites\\gunni.io\\chat.txt';
+
+// Endpoint to handle new chat messages
+app.post('/append', (req, res) => {
+  const { message } = req.body;
+  if (!message) {
+    return res.status(400).send('No message provided');
   }
-
-  // Save to JSON file (for demonstration; replace with a database in production)
-  const entry = { name, message, date: new Date() };
   
-  fs.readFile('guestbook.json', (err, data) => {
-    const guestbook = JSON.parse(data || '[]');
-    guestbook.push(entry);
-    
-    fs.writeFile('guestbook.json', JSON.stringify(guestbook, null, 2), (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error saving entry.' });
-      }
-      res.status(201).json({ message: 'Entry added successfully!' });
-    });
+  // Append the message along with a newline
+  fs.appendFile(chatFilePath, message + '\n', (err) => {
+    if (err) {
+      console.error('Error appending to file:', err);
+      return res.status(500).send('Error appending file');
+    }
+    res.send('Message appended!');
   });
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
