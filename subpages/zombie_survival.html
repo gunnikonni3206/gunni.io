@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Zombie Survival</title>
+  <style>
+    body {
+      background: #222;
+      color: #ddd;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    canvas {
+      background: #333;
+      display: block;
+      margin: 20px auto;
+      border: 2px solid #555;
+    }
+    #info {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="info">
+    <p>
+      Health: <span id="healthDisplay"></span> &nbsp;
+      Money: <span id="moneyDisplay"></span> &nbsp;
+      Wave: <span id="waveDisplay"></span> &nbsp;
+      Mode: <span id="modeDisplay"></span>
+    </p>
+    <p>
+      Controls: Move (WASD/Arrow Keys) | Shoot (Left Click in Shoot Mode) | Toggle Build Mode (B)
+    </p>
+  </div>
+  <script>
+    // ----- Setup Canvas and Global Variables -----
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // For keyboard input
+    let keys = {};
+    document.addEventListener('keydown', function(e) {
+      keys[e.key.toLowerCase()] = true;
+      // Toggle build mode when pressing "B"
+      if (e.key.toLowerCase() === 'b') {
+        mode = (mode === "shoot" ? "build" : "shoot");
+      }
+    });
+    document.addEventListener('keyup', function(e) {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    // For mouse position and clicks
+    let mouse = { x: 0, y: 0 };
+    canvas.addEventListener('mousemove', function(e) {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = e.clientX - rect.left;
+      mouse.y = e.clientY - rect.top;
+    });
+
+    // ----- Game Entities -----
+    // The Player (Survivor)
+    let player = {
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      radius: 15,
+      speed: 3,
+      health: 100
+    };
+
+    // Arrays to hold bullets, zombies, and barricades
+    let bullets = [];
+    let zombies = [];
+    let barricades = [];
+
+    // Game state variables
+    let mode = "shoot"; // Modes: "shoot" or "build"
+    let money = 100;
+    let wave = 1;
+    let zombiesToSpawn = wave * 5;
+    let spawnTimer = 0;
+    const SPAWN_INTERVAL = 60; // frames between zombie spawns
+
+    // Building parameters
+    const buildCost = 30;
+    const gridSize = 40; // used to snap barricade placement
+
+    // ----- Input: Mouse Click (Shooting or Building) -----
+    canvas.addEventListener('click', function(e) {
+      if (mode === "shoot") {
+        // In shoot mode, fire a bullet toward the mouse cursor.
+        let angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        const bulletSpeed = 6;
+        bullets.push({
+          x: player.x,
+          y: player.y,
+          vx: Math.cos(angle) * bulletSpeed,
+          vy: Math.sin(angle) * bulletSpeed,
+          radius: 4,
+          damage: 50,
+          lifetime: 60 // frames
+        });
+      } else if (mode === "build") {
+        // In build mode, place a barricade on the grid where you clicked.
+        let gridX = Math.floor(mouse.x / gridSize) * gridSize;
+        let gridY = Math.floor(mouse.y / gridSize) * gridSize;
+        // Do not allow placing where one already exists.
+        let exists = barricades.some(b => b.x === gridX && b.y === gridY);
+        if (!exists && money >= buildCost) {
+          money -= buildCost;
+          barricades.push({
+            x: gridX,
+            y: gridY,
+            width: gridSize,
+            height: gridSize,
+            health: 100
+          });
+        }
+      }
+    });
+
+    // ----- Helper Function: Circle-Rectangle Collision -----
+    function circleRectCollision(cx, cy, radius, rx, ry, rw, rh) {
+      let closestX = Math.max(rx, Math.min(cx, rx + rw));
+      let closestY = Math.max(ry, Math.min(cy, ry + rh));
+      let dx = cx - closestX;
+      let dy = cy - closestY;
+      return (dx * dx + dy * dy) < (radius * radius);
+    }
+
+    // ----- Spawning Zombies -----
+    function spawnZombie() {
+      // Spawn a zombie at a random edge of the canvas.
+      let edge = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+      let x, y;
+      if (edge === 0) {
+        x = Math.random() * canvas.width;
+        y = -20;
+      } else if (edge === 1) {
+        x = canvas.width + 20;
+        y = Math.random() * canvas.height;
+      } else if (edge === 2) {
+        x = Math.random() * canvas.width;
+        y = canvas.height + 20;
+      } else {
+        x = -20;
+        y = Math.random() * canvas.height;
+      }
+      return {
+        x: x,
+        y: y,
+        radius: 15,
+        health: 100,
+        speed: 1.0 + wave * 0.1,  // slightly faster with each wave
+        contactDamage: 10,        // damage dealt to the player on contact
+        damagePerFrame: 0.5       // damage dealt per frame to a barricade when attacking it
+      };
+    }
+
+    // ----- Game Update Function -----
+    function update() {
+      // -- Player Movement --
+      let dx = 0, dy = 0;
+      if (keys['w'] || keys['arrowup']) dy -= 1;
+      if (keys['s'] || keys['arrowdown']) dy += 1;
+      if (keys['a'] || keys['arrowleft']) dx -= 1;
+      if (keys['d'] || keys['arrowright']) dx += 1;
+      if (dx || dy) {
+        let mag = Math.sqrt(dx * dx + dy * dy);
+        dx /= mag;
+        dy /= mag;
+      }
+      player.x += dx * player.speed;
+      player.y += dy * player.speed;
+      // Keep the player inside the canvas.
+      if (player.x < player.radius) player.x = player.radius;
+      if (player.x > canvas.width - player.radius) player.x = canvas.width - player.radius;
+      if (player.y < player.radius) player.y = player.radius;
+      if (player.y > canvas.height - player.radius) player.y = canvas.height - player.radius;
+
+      // -- Update Bullets --
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+        b.lifetime--;
+        // Remove bullet if it expires or leaves the screen.
+        if (b.lifetime <= 0 || b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+          bullets.splice(i, 1);
+          continue;
+        }
+        // Check collision with zombies.
+        for (let j = zombies.length - 1; j >= 0; j--) {
+          let z = zombies[j];
+          let dist = Math.hypot(b.x - z.x, b.y - z.y);
+          if (dist < b.radius + z.radius) {
+            z.health -= b.damage;
+            bullets.splice(i, 1);
+            break;
+          }
+        }
+      }
+
+      // -- Update Zombies --
+      for (let i = zombies.length - 1; i >= 0; i--) {
+        let z = zombies[i];
+        if (z.health <= 0) {
+          money += 10; // Earn money for killing a zombie.
+          zombies.splice(i, 1);
+          continue;
+        }
+        // Calculate movement toward the player.
+        let angle = Math.atan2(player.y - z.y, player.x - z.x);
+        let vx = Math.cos(angle) * z.speed;
+        let vy = Math.sin(angle) * z.speed;
+        let newX = z.x + vx;
+        let newY = z.y + vy;
+
+        // Check if the zombie would collide with any barricade.
+        let collidedBarricade = null;
+        for (let b of barricades) {
+          if (circleRectCollision(newX, newY, z.radius, b.x, b.y, b.width, b.height)) {
+            collidedBarricade = b;
+            break;
+          }
+        }
+        if (collidedBarricade) {
+          // Stop moving and damage the barricade.
+          collidedBarricade.health -= z.damagePerFrame;
+          if (collidedBarricade.health <= 0) {
+            barricades = barricades.filter(b => b !== collidedBarricade);
+          }
+        } else {
+          // Otherwise, move normally.
+          z.x = newX;
+          z.y = newY;
+        }
+        // Check collision with the player.
+        let distToPlayer = Math.hypot(z.x - player.x, z.y - player.y);
+        if (distToPlayer < z.radius + player.radius) {
+          player.health -= z.contactDamage;
+          zombies.splice(i, 1);
+        }
+      }
+
+      // -- Spawn Zombies for the Current Wave --
+      if (zombiesToSpawn > 0) {
+        spawnTimer--;
+        if (spawnTimer <= 0) {
+          zombies.push(spawnZombie());
+          zombiesToSpawn--;
+          spawnTimer = SPAWN_INTERVAL;
+        }
+      } else if (zombies.length === 0) {
+        // When all zombies are gone, begin the next wave.
+        wave++;
+        zombiesToSpawn = wave * 5;
+      }
+    }
+
+    // ----- Draw Function -----
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw the player.
+      ctx.fillStyle = "#0f0";
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw bullets.
+      ctx.fillStyle = "#ff0";
+      bullets.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Draw zombies.
+      zombies.forEach(z => {
+        ctx.fillStyle = "#f00";
+        ctx.beginPath();
+        ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // Zombie health bar.
+        ctx.fillStyle = "#000";
+        ctx.fillRect(z.x - z.radius, z.y - z.radius - 10, z.radius * 2, 5);
+        ctx.fillStyle = "#0f0";
+        let healthWidth = (z.health / 100) * (z.radius * 2);
+        ctx.fillRect(z.x - z.radius, z.y - z.radius - 10, healthWidth, 5);
+      });
+
+      // Draw barricades.
+      barricades.forEach(b => {
+        ctx.fillStyle = "#888";
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+        // Barricade health bar.
+        ctx.fillStyle = "#0f0";
+        let healthRatio = b.health / 100;
+        ctx.fillRect(b.x, b.y - 10, b.width * healthRatio, 5);
+      });
+
+      // Update the UI display.
+      document.getElementById("healthDisplay").innerText = player.health;
+      document.getElementById("moneyDisplay").innerText = money;
+      document.getElementById("waveDisplay").innerText = wave;
+      document.getElementById("modeDisplay").innerText = mode;
+    }
+
+    // ----- Main Game Loop -----
+    function gameLoop() {
+      update();
+      draw();
+      if (player.health > 0) {
+        requestAnimationFrame(gameLoop);
+      } else {
+        // Game Over screen.
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.font = "48px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    // Start the game.
+    gameLoop();
+  </script>
+</body>
+</html>
