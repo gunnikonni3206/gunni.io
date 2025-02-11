@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>My Rad Retro Site</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
   <style>
-    /* Base Styles */
     body {
       background-image: url(https://onlinegiftools.com/images/examples-onlinegiftools/surface-3d-projection.gif);
       background-repeat: no-repeat;
@@ -55,7 +55,6 @@
       display: flex;
       flex: 1;
     }
-    /* Increased sidebar width to 300px */
     .sidebar {
       background-color: rgba(255, 255, 204, 0.8);
       padding: 15px;
@@ -81,6 +80,23 @@
     }
     .sidebar ul li a:hover {
       text-decoration: underline;
+    }
+    .toptext {
+      background-color: rgba(255, 255, 204, 0.8);
+      border-radius: 8px;
+    }
+    .toptext p {
+      color: #333333;
+    }
+    .toptext ul {
+      list-style-type: none;
+    }
+    .toptext a {
+      text-decoration: none;
+      color: #0077cc;
+    }
+    .toptext a:hover {
+      color: #00ff37;
     }
     .main {
       flex: 1;
@@ -119,40 +135,11 @@
       border: 1px solid #663300;
       padding: 10px;
       text-align: center;
-      color: #000;
-    }
-    .guestbook {
-      margin-top: 20px;
-    }
-    .guestbook form {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-    }
-    .guestbook input,
-    .guestbook textarea {
-      margin-bottom: 10px;
-      padding: 5px;
-      border: 1px solid #663300;
+      color: #ffffff;
     }
     .construction {
       text-align: center;
       margin-top: 20px;
-    }
-    .midi-player {
-      background-color: rgba(255, 255, 204, 0.9);
-      padding: 15px;
-      border: 3px inset #663300;
-      margin-top: 20px;
-      text-align: center;
-      font-size: 1.5em;
-      color: #000;
-    }
-    .hit-counter {
-      text-align: center;
-      font-size: 1.5em;
-      margin-top: 20px;
-      color: #000;
     }
     .gif-container {
       display: flex;
@@ -294,7 +281,7 @@
       0% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
       100% { box-shadow: 0 0 20px rgba(255, 255, 255, 1); }
     }
-    /* ===== Chat Sidebar Styles (Updated) ===== */
+    /* Chat Sidebar Styles */
     .chat-sidebar {
       margin-top: 20px;
       padding-top: 10px;
@@ -305,7 +292,6 @@
       font-size: 1.2em;
       text-align: center;
     }
-    /* The utterances container is now fixed-height and scrollable */
     .chat-sidebar .utterances-container {
       border: 2px solid #663300;
       border-radius: 8px;
@@ -316,7 +302,6 @@
       max-height: 300px;
       overflow-y: auto;
     }
-    /* New button for scrolling down within the chat box */
     .scroll-down-btn {
       display: block;
       width: 100%;
@@ -332,20 +317,82 @@
     .scroll-down-btn:hover {
       background-color: #993300;
     }
+    /* Tower Stacking Game Styles */
+    .tower-stacking-game {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #222;
+      color: #0f0;
+      font-family: 'Press Start 2P', cursive;
+      border: 3px solid #663300;
+      text-align: center;
+    }
+    .tower-stacking-game canvas {
+      background-color: #000;
+      border: 2px solid #663300;
+      display: block;
+      margin: 0 auto;
+    }
+    .tower-stacking-game button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.8em;
+      border: 2px solid #00ff00;
+      background: linear-gradient(45deg, #00ff00, #006600);
+      color: #000;
+      cursor: pointer;
+      border-radius: 5px;
+      box-shadow: 0 0 10px #00ff00;
+    }
+    #subIntroOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      z-index: 10000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: #FFCC99;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 2em;
+      text-shadow: 0 0 10px #FFCC99;
+      transition: transform 1.5s ease-out, opacity 1.5s ease-out;
+    }
+    #subIntroOverlay.hidden {
+      transform: scale(20);
+      opacity: 0;
+    }
+    /* New YouTube Player Styles */
+    .youtube-player {
+      background-color: rgba(255, 255, 204, 0.9);
+      padding: 15px;
+      border: 3px inset #663300;
+      margin-top: 20px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <div id="subIntroOverlay">
+    <p>Welcome to my Website full of FUN!!! <span class="blinking">&#9733;</span></p>
+  </div>
+
   <header>
     <h1>
-      Welcome to my Retro Website!
+      Welcome to my Website full of FUN!!!
       <span class="blinking">&#9733;</span>
     </h1>
     <nav>
-      <button onclick="location.href='subpages/about.html'">About</button>
-      <button onclick="location.href='subpages/gallery.html'">Gallery</button>
-      <button onclick="location.href='subpages/contact.html'">Contact</button>
-      <button onclick="location.href='subpages/links.html'">Links</button>
-      <button onclick="location.href='subpages/games.html'">Game</button>
+      <button onclick="location.href='about.html'">About</button>
+      <button onclick="location.href='gallery.html'">Gallery</button>
+      <button onclick="location.href='contact.html'">Contact</button>
+      <button onclick="location.href='links.html'">Links</button>
+      <button onclick="location.href='games.html'">Game</button>
     </nav>
   </header>
 
@@ -360,10 +407,8 @@
         <li><a href="#">Link 5</a></li>
       </ul>
 
-      <!-- ===== Chat Interface Embedded in Sidebar ===== -->
       <div class="chat-sidebar">
-        <h3>Live Chat</h3>
-        <!-- Only the default Utterances integration remains inside a scrollable container -->
+        <h3>Web Chat</h3>
         <div class="utterances-container">
           <script
             src="https://utteranc.es/client.js"
@@ -375,75 +420,70 @@
             async>
           </script>
         </div>
-        <!-- Down-arrow button that scrolls only the chat box to its bottom -->
         <button class="scroll-down-btn" onclick="scrollToChat()">&#x2193;</button>
-        <!-- Button linking to the full chat page -->
-        <button onclick="location.href='subpages/chat.html'" style="width: 100%; margin-top:10px; padding: 5px; font-size:0.9em;">
+        <button onclick="location.href='chat.html'" style="width: 100%; margin-top:10px; padding: 5px; font-size:0.9em;">
           Go to Chat Page
         </button>
+      </div>
+
+      <!-- Retro Tower Stacking Game -->
+      <div class="tower-stacking-game">
+        <h3>Tower Stacking</h3>
+        <canvas id="towerCanvas" width="280" height="300"></canvas>
+        <p id="towerScore">Score: 0</p>
+        <button id="towerRestart" style="display: none;">Restart Tower Game</button>
       </div>
     </div>
 
     <div class="main">
-      <p>
-        What's up? This is my super cool website. I like to put stuff online and share it with everyone.
-        Take a look at these awesome links:
-      </p>
-
-      <ul>
-        <li><a href="https://www.askjeeves.com">Ask Jeeves!</a></li>
-        <li><a href="https://www.geocities.com/SunsetStrip/Palms/8314/">GeoCities</a></li>
-        <li><a href="https://www.angelfire.com">Angelfire</a></li>
-      </ul>
-
+      <div class="toptext">
+        <p>
+          What's up? This is my super cool website. I like to put stuff online and share it with everyone.
+          Take a look at these awesome links:
+        </p>
+        <ul>
+          <li><a href="https://www.askjeeves.com">Ask Jeeves!</a></li>
+          <li><a href="https://www.geocities.com/SunsetStrip/Palms/8314/">GeoCities</a></li>
+          <li><a href="https://www.angelfire.com">Angelfire</a></li>
+        </ul>
+      </div>
+      
       <p>Here's a rad table:</p>
       <table>
         <tr>
-          <th>Favorite Bands</th>
+          <th>Favorite Artist</th>
           <th>Favorite Movies</th>
           <th>Favorite Games</th>
         </tr>
         <tr>
-          <td>Blink-182</td>
-          <td>The Matrix</td>
-          <td>Tony Hawk's Pro Skater</td>
+          <td>Ken Carson</td>
+          <td>rango</td>
+          <td>terraria</td>
         </tr>
         <tr>
-          <td>Britney Spears</td>
-          <td>American Pie</td>
-          <td>The Sims</td>
+          <td>mice band</td>
+          <td>kung fury</td>
+          <td>spore</td>
         </tr>
       </table>
 
       <marquee>
-        This is a scrolling marquee with important information!
+        dont miss 2026!
       </marquee>
 
       <div class="gif-replace">
         <img src="https://i.gifer.com/4jwo.gif" alt="Ad GIF" />
       </div>
 
-      <div class="guestbook">
-        <h2>Sign my Guestbook</h2>
-        <form action="#" method="post">
-          <label for="name">Name:</label>
-          <input type="text" id="name" name="name" required />
-
-          <label for="message">Message:</label>
-          <textarea id="message" name="message" rows="4" required></textarea>
-
-          <input type="submit" value="Submit" />
-        </form>
-      </div>
-
       <div class="construction">
-        <img src="https://www.animatedimages.org/data/media/145/animated-construction-image-0017.gif" alt="Under Construction" />
+        <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExamZyemN1aDZ1djZkemppOHQ5ZWxlbDBqMTd2eXh0emN4N3hkbTRuYyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/fxGwvQJ4rT1WIfYB4X/giphy.gif" alt="Under Construction" />
         <p>This site is under construction!</p>
       </div>
 
-      <div class="midi-player">
-        <h3>Listen to this cool MIDI music:</h3>
-        <embed src="https://www.myinstants.com/media/sounds/midi-mario.mp3" autostart="true" loop="true" width="200" height="20" />
+      <!-- Replaced Guestbook and MIDI sections with a polished YouTube player -->
+      <div class="youtube-player">
+        <h3>Featured Video</h3>
+        <iframe width="560" height="315" src="https://www.youtube.com/embed/_nRxfjUg1dA?si=fa_CvonGzsXk6pZU" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
       </div>
 
       <div class="hit-counter">
@@ -458,7 +498,7 @@
   <div class="gif-section">
     <h2>Awesome GIFs!</h2>
     <div class="gif-container">
-      <img src="https://milnersblog.com/wp-content/uploads/2012/07/alien-3d-lenticular-animated-gif.gif" class="gif" alt="Alien GIF" />
+      <img src="https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTU5bDd5dzd2YW5mMWR5MGFhaWIzdG1pc2hyeHB3MWZrZ2Z3ZHY2ZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7WTFmAMnKd7DyrQY/giphy.gif" class="gif" alt="Alien GIF" />
       <p>Alien 3D GIF</p>
       <img src="https://64.media.tumblr.com/c7afc2c50ed9e85688f41ecd01cd66bb/506b3524aab785ba-a1/s500x750/245391ee0bac3e5a808859985fd5d9ab18300ff6.gif" class="gif" alt="GIF" />
       <p>Cool Animated GIF</p>
@@ -492,14 +532,13 @@
       <p>Classic Digimon GIF</p>
       <img src="https://media.tenor.com/xgQ-T2IwVQEAAAAM/omnimon-power.gif" class="gif" alt="Omnimon GIF" />
       <p>Omnimon Power GIF</p>
-      <img src="https://i.imgur.com/9YaA1Ah.gif" class="gif" alt="Omnimon GIF" />
+      <img src="https://64.media.tumblr.com/69b9e052f3ec3676d2584ec642f1a687/0cdf0c75c55ebada-34/s540x810/b0dfb6644219777ed725e8f4d7336a3b2b3cd313.gif" class="gif" alt="Omnimons GIF" />
       <p>Omnimon Transformation GIF</p>
       <img src="https://comicvine.gamespot.com/a/uploads/original/11130/111301681/7883173-altdelete.gif" class="gif" alt="Omnimon GIF" />
       <p>Omnimon Alt GIF</p>
     </div>
   </div>
 
-  <!-- Snake Game Section -->
   <div class="snake-game">
     <h2>Play Snake!</h2>
     <div class="score-board">
@@ -507,7 +546,7 @@
       <span>High Score: <span id="highScore">0</span></span>
     </div>
     <canvas id="snakeCanvas" width="400" height="400"></canvas>
-    <!-- Game Over Overlay -->
+
     <div class="game-over" id="gameOver">
       <p>Game Over!</p>
       <p>Your Score: <span id="finalScore">0</span></p>
@@ -527,26 +566,21 @@
     <p>&copy; 2024 My Retro Website | All Rights Reserved</p>
     <p>Follow us on:</p>
     <p>
-      <a href="#" style="color: #000;">Facebook</a> |
-      <a href="#" style="color: #000;">Twitter</a> |
-      <a href="#" style="color: #000;">Instagram</a> |
-      <a href="#" style="color: #000;">YouTube</a>
+      <a href="https://x.com/gunnikonni1" style="color: #000;">Twitter</a> |
+      <a href="https://www.youtube.com/@wojbjart/videos" style="color: #000;">YouTube</a>
     </p>
     <p>Contact us: info@myretrowebsite.com</p>
     <p>Check out our latest updates on our blog!</p>
   </footer>
 
-  <!-- Scroll-to-Bottom Script for the Chat Box -->
   <script>
     function scrollToChat() {
-      // Scroll only the utterances container (chat box) to the bottom
       const chatContainer = document.querySelector('.chat-sidebar .utterances-container');
       if (chatContainer) {
         chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
       }
     }
     
-    // Optional: Auto-scroll the utterances container to the bottom when the iframe loads
     const utterancesContainer = document.querySelector('.chat-sidebar .utterances-container');
     const observer = new MutationObserver(mutations => {
       mutations.forEach(mutation => {
@@ -562,17 +596,17 @@
     observer.observe(utterancesContainer, { childList: true });
   </script>
 
-  <!-- Existing Scripts (Ad & Snake Game) -->
   <script>
-    // Advertisement Script
     function showAd() {
       const ad = document.getElementById("ad");
       const shouldShow = Math.random() < 0.5;
       ad.style.display = shouldShow ? "block" : "none";
     }
     setInterval(showAd, 10000);
+  </script>
 
-    // Snake Game JavaScript
+  <script>
+    // Snake Game Script (unchanged)
     const canvas = document.getElementById("snakeCanvas");
     const ctx = canvas.getContext("2d");
 
@@ -707,7 +741,159 @@
     requestAnimationFrame(gameLoop);
   </script>
 
-  <!-- Existing Ad Button -->
-  <a class="ad-button" href="subpages/ads.html">Click for Ads!</a>
+  <!-- Retro Tower Stacking Game Script with Delta Time, Glows & Gradients, and Restart -->
+  <script>
+    const towerCanvas = document.getElementById("towerCanvas");
+    const towerCtx = towerCanvas.getContext("2d");
+
+    // Global variables for the Tower game
+    let towerBlockWidth = 200;
+    const towerBlockHeight = 30;
+    let towerScore = 0;
+    let gameOverTower = false;
+    let lastTimeTower = null;
+
+    // Stack array holds placed blocks.
+    const stack = [];
+    // Add base block (centered)
+    stack.push({ x: (towerCanvas.width - towerBlockWidth) / 2, width: towerBlockWidth, y: towerCanvas.height - towerBlockHeight });
+
+    // Current moving block (starts above the base)
+    let currentBlock = {
+      x: 0,
+      y: towerCanvas.height - towerBlockHeight * 2,
+      width: towerBlockWidth,
+      direction: 1, // 1: moving right, -1: moving left
+      speed: 150 // pixels per second
+    };
+
+    function drawTower() {
+      towerCtx.clearRect(0, 0, towerCanvas.width, towerCanvas.height);
+      // Calculate an offset if the tower goes off the top so you can keep stacking
+      const offset = currentBlock.y < 0 ? -currentBlock.y : 0;
+
+      // Draw each block in the stack with a glowing gradient
+      for (let block of stack) {
+        const grad = towerCtx.createLinearGradient(block.x, block.y + offset, block.x + block.width, block.y + offset + towerBlockHeight);
+        grad.addColorStop(0, "#00ff00");
+        grad.addColorStop(1, "#006600");
+        towerCtx.shadowBlur = 15;
+        towerCtx.shadowColor = "#00ff00";
+        towerCtx.fillStyle = grad;
+        towerCtx.fillRect(block.x, block.y + offset, block.width, towerBlockHeight);
+        towerCtx.shadowBlur = 0;
+      }
+      // Draw the current moving block with a yellow glow
+      if (!gameOverTower) {
+        const grad = towerCtx.createLinearGradient(currentBlock.x, currentBlock.y + offset, currentBlock.x + currentBlock.width, currentBlock.y + offset + towerBlockHeight);
+        grad.addColorStop(0, "#ffff00");
+        grad.addColorStop(1, "#ffaa00");
+        towerCtx.shadowBlur = 20;
+        towerCtx.shadowColor = "#ffff00";
+        towerCtx.fillStyle = grad;
+        towerCtx.fillRect(currentBlock.x, currentBlock.y + offset, currentBlock.width, towerBlockHeight);
+        towerCtx.shadowBlur = 0;
+      }
+    }
+
+    // Use delta time for smooth movement
+    function updateTower(timestamp) {
+      if (lastTimeTower === null) lastTimeTower = timestamp;
+      const dt = (timestamp - lastTimeTower) / 1000; // seconds elapsed
+      lastTimeTower = timestamp;
+
+      if (!gameOverTower) {
+        // Update current block's horizontal position using delta time
+        currentBlock.x += currentBlock.speed * dt * currentBlock.direction;
+        // Reverse direction if hitting the canvas edges
+        if (currentBlock.x < 0) {
+          currentBlock.x = 0;
+          currentBlock.direction = 1;
+        } else if (currentBlock.x + currentBlock.width > towerCanvas.width) {
+          currentBlock.x = towerCanvas.width - currentBlock.width;
+          currentBlock.direction = -1;
+        }
+      }
+      drawTower();
+      if (!gameOverTower) requestAnimationFrame(updateTower);
+    }
+
+    // Called when the player "drops" the block (click on canvas or press Space)
+    function dropBlock() {
+      if (gameOverTower) return;
+      const lastBlock = stack[stack.length - 1];
+      const overlapStart = Math.max(lastBlock.x, currentBlock.x);
+      const overlapEnd = Math.min(lastBlock.x + lastBlock.width, currentBlock.x + currentBlock.width);
+      const overlapWidth = overlapEnd - overlapStart;
+
+      // If no overlap, game over
+      if (overlapWidth <= 0) {
+        gameOverTower = true;
+        document.getElementById("towerRestart").style.display = "block";
+        return;
+      }
+
+      // Trim the current block to the overlapping region
+      currentBlock.width = overlapWidth;
+      currentBlock.x = overlapStart;
+      // Add the block to the stack with its current y coordinate
+      stack.push({ x: currentBlock.x, width: currentBlock.width, y: currentBlock.y });
+      towerScore++;
+      document.getElementById("towerScore").textContent = "Score: " + towerScore;
+
+      // Prepare the next block: move up by one block height
+      currentBlock.y -= towerBlockHeight;
+      // Reset horizontal position and direction for new block
+      currentBlock.x = 0;
+      currentBlock.direction = 1;
+      // Increase speed slightly for added challenge
+      currentBlock.speed += 20;
+      // Continue the animation (if it had been stopped due to game over, it won't restart here)
+    }
+
+    // Restart the tower stacking game
+    function restartTower() {
+      towerScore = 0;
+      document.getElementById("towerScore").textContent = "Score: " + towerScore;
+      // Reset the stack with a new base block
+      stack.length = 0;
+      stack.push({ x: (towerCanvas.width - towerBlockWidth) / 2, width: towerBlockWidth, y: towerCanvas.height - towerBlockHeight });
+      // Reset the current moving block
+      currentBlock = {
+        x: 0,
+        y: towerCanvas.height - towerBlockHeight * 2,
+        width: towerBlockWidth,
+        direction: 1,
+        speed: 150
+      };
+      gameOverTower = false;
+      lastTimeTower = null;
+      document.getElementById("towerRestart").style.display = "none";
+      requestAnimationFrame(updateTower);
+    }
+
+    // Event listeners for dropping a block
+    towerCanvas.addEventListener("click", dropBlock);
+    document.addEventListener("keydown", function(e) {
+      if (e.code === "Space") dropBlock();
+    });
+    // Event listener for the restart button
+    document.getElementById("towerRestart").addEventListener("click", restartTower);
+
+    // Start the tower game animation
+    requestAnimationFrame(updateTower);
+  </script>
+
+  <a class="ad-button" href="ads.html">Click for Ads!</a>
+
+  <script>
+    window.addEventListener("load", function() {
+      setTimeout(function() {
+        const overlay = document.getElementById("subIntroOverlay");
+        overlay.classList.add("hidden");
+        setTimeout(() => overlay.remove(), 1500);
+      }, 500);
+    });
+  </script>
 </body>
 </html>

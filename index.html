@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gunni.io Intro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: black;
+      font-family: 'Press Start 2P', cursive;
+      color: #fff;
+    }
+    #introWrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    .enter-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      text-align: center;
+    }
+    .enter-button {
+      padding: 20px 40px;
+      font-size: 24px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      border: 3px solid #FFCC99;
+      background: transparent;
+      color: #FFCC99;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .enter-button:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 20px #FFCC99;
+    }
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('https://i.imgur.com/TdQz8nT.png');
+      opacity: 0.1;
+      z-index: 3;
+      pointer-events: none;
+    }
+    #introWrapper.zoom-out {
+      animation: zoomOut 1.5s forwards ease-in-out;
+    }
+    @keyframes zoomOut {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(20);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="introWrapper">
+    <canvas id="starsCanvas"></canvas>
+  
+    <div class="enter-container" id="enterContainer">
+      <button class="enter-button" id="enterButton">ENTER</button>
+    </div>
+  
+    <div class="overlay"></div>
+  </div>
+  
+  <script>
+    const canvas = document.getElementById('starsCanvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const numStars = 500;
+    const stars = [];
+  
+    function random(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+  
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: centerX,
+        y: centerY,
+        angle: random(0, 2 * Math.PI),
+        speed: random(0.5, 3),
+        size: random(0.5, 2),
+        distance: 0
+      });
+    }
+  
+    function updateStars() {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+      ctx.fillRect(0, 0, width, height);
+  
+      for (let star of stars) {
+        star.distance += star.speed;
+        star.x = centerX + Math.cos(star.angle) * star.distance;
+        star.y = centerY + Math.sin(star.angle) * star.distance;
+        const starSize = star.size + star.distance * 0.005;
+  
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, starSize, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFCC99";
+        ctx.fill();
+  
+        if (star.x < 0 || star.x > width || star.y < 0 || star.y > height) {
+          star.x = centerX;
+          star.y = centerY;
+          star.angle = random(0, 2 * Math.PI);
+          star.speed = random(0.5, 3);
+          star.distance = 0;
+          star.size = random(0.5, 2);
+        }
+      }
+      requestAnimationFrame(updateStars);
+    }
+  
+    updateStars();
+  
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+  
+    const enterButton = document.getElementById('enterButton');
+    enterButton.addEventListener('click', () => {
+      document.getElementById('introWrapper').classList.add('zoom-out');
+
+      setTimeout(() => {
+        window.location.href = "subpages/index.html";
+      }, 1500);
+    });
+  </script>
+</body>
+</html>

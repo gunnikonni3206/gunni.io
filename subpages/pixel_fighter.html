@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Infinite Cube Platformer – Extra Enemies, Shooting Upgrades & Effects</title>
+  <style>
+    body {
+      margin: 0;
+      background: #222;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: #fff;
+    }
+    /* Control Panel Overlay */
+    #controlPanel {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border: 1px solid #fff;
+      z-index: 10;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      /* The background will be drawn as a gradient in the draw() function */
+    }
+  </style>
+</head>
+<body>
+  <!-- Control Panel (always visible) -->
+  <div id="controlPanel">
+    <h3>Controls</h3>
+    <p><strong>Move:</strong> Arrow keys / WASD</p>
+    <p><strong>Jump:</strong> Up / W / Space</p>
+    <p><strong>Shoot:</strong> K (if unlocked)</p>
+    <p><strong>Block:</strong> B (if unlocked)</p>
+    <p><strong>Parry:</strong> E (when boss projectiles hit)</p>
+    <p><strong>Upgrade:</strong> 1, 2, or 3</p>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script>
+    /***************************************
+     * Global Variables and Setup
+     ***************************************/
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Input keys
+    const keys = {};
+    window.addEventListener("keydown", (e) => { keys[e.key] = true; });
+    window.addEventListener("keyup", (e) => { keys[e.key] = false; });
+
+    // World and camera
+    let scrollX = 0;
+    let platforms = [];
+    let enemies = [];
+    let projectiles = [];
+    let particles = [];
+
+    // Upgrade system variables
+    let upgradeMenuActive = false;
+    let currentUpgradeOptions = [];
+    let killCount = 0;
+    let nextUpgradeThreshold = 3;
+    let score = 0;
+
+    // Boss variables
+    let boss = null;
+    // Every 10 km (10,000 px) a boss appears.
+    let nextBossSpawnDistance = 10000; 
+
+    // Timer for flying enemy spawns
+    let flyingEnemySpawnTimer = 300; // in frames
+
+    // Physics constants
+    const gravity = 0.5;
+    const friction = 0.8;
+
+    /***************************************
+     * Player Object – Upgradeable Stats
+     ***************************************/
+    const player = {
+      x: 50,
+      y: 0,
+      width: 32,
+      height: 32,
+      vx: 0,
+      vy: 0,
+      onGround: false,
+      lives: 3,
+      jumps: 2,         // Maximum double jump count
+      moveSpeed: 5,
+      jumpPower: 10,
+      shootEnabled: false,
+      shootCooldown: 0,
+      shootCooldownMax: 20,  // This value can be reduced by upgrades
+      shootLevel: 0,         // Determines extra projectiles
+      bulletSpeed: 8,        // Base projectile speed
+      facing: "right",
+      blockEnabled: false,
+      blockActive: false,
+      blockDuration: 60, // frames active
+      blockTimer: 0,
+      blockCooldown: 0
+    };
+
+    /***************************************
+     * Upgrade Definitions
+     ***************************************/
+    // Each upgrade option has an id, name, description, and an apply() function.
+    const availableUpgrades = [
+      {
+        id: "shoot",
+        name: "Basic Shooting",
+        description: "Unlock shooting (press K).",
+        apply: function() {
+          player.shootEnabled = true;
+          player.shootLevel = 1;
+        }
+      },
+      {
+        id: "rapidFire",
+        name: "Rapid Fire Upgrade",
+        description: "Reduce shoot cooldown.",
+        apply: function() {
+          if (player.shootEnabled) {
+            player.shootCooldownMax = Math.max((player.shootCooldownMax || 20) - 3, 5);
+          }
+        }
+      },
+      {
+        id: "multiShot",
+        name: "Multi-Shot Upgrade",
+        description: "Fire extra projectiles.",
+        apply: function() {
+          if (player.shootEnabled) {
+            player.shootLevel++;
+          }
+        }
+      },
+      {
+        id: "bulletSpeed",
+        name: "Bullet Speed Upgrade",
+        description: "Increase projectile speed.",
+        apply: function() {
+          if (player.shootEnabled) {
+            player.bulletSpeed = (player.bulletSpeed || 8) + 2;
+          }
+        }
+      },
+      {
+        id: "jump",
+        name: "Jump Upgrade",
+        description: "Increase jump power.",
+        apply: function() {
+          player.jumpPower += 2;
+        }
+      },
+      {
+        id: "speed",
+        name: "Speed Upgrade",
+        description: "Increase movement speed.",
+        apply: function() {
+          player.moveSpeed += 1;
+        }
+      },
+      {
+        id: "block",
+        name: "Block Upgrade",
+        description: "Unlock block ability (press B).",
+        apply: function() {
+          player.blockEnabled = true;
+        }
+      },
+      {
+        id: "health",
+        name: "Health Upgrade",
+        description: "Gain an extra life.",
+        apply: function() {
+          player.lives += 1;
+        }
+      }
+    ];
+
+    /***************************************
+     * Level and World Functions
+     ***************************************/
+    function initLevel() {
+      platforms = [];
+      enemies = [];
+      // Starting ground platform (covers the beginning area)
+      platforms.push({ x: -200, y: 550, width: 800, height: 50, type: "ground" });
+      // A floating platform for variety.
+      platforms.push({ x: 300, y: 450, width: 150, height: 20, type: "floating" });
+    }
+    initLevel();
+
+    function resetGame() {
+      player.x = 50;
+      player.y = 0;
+      player.vx = 0;
+      player.vy = 0;
+      player.lives = 3;
+      player.jumps = 2;
+      player.moveSpeed = 5;
+      player.jumpPower = 10;
+      player.shootEnabled = false;
+      player.shootCooldown = 0;
+      player.shootCooldownMax = 20;
+      player.shootLevel = 0;
+      player.bulletSpeed = 8;
+      player.blockEnabled = false;
+      player.blockActive = false;
+      killCount = 0;
+      nextUpgradeThreshold = 3;
+      score = 0;
+      scrollX = 0;
+      boss = null;
+      nextBossSpawnDistance = 10000;
+      initLevel();
+      enemies = [];
+      projectiles = [];
+    }
+
+    // Simple AABB collision detection
+    function rectsCollide(r1, r2) {
+      return (
+        r1.x < r2.x + r2.width &&
+        r1.x + r1.width > r2.x &&
+        r1.y < r2.y + r2.height &&
+        r1.y + r1.height > r2.y
+      );
+    }
+
+    /***************************************
+     * Particle System with Radial Gradients
+     ***************************************/
+    function spawnParticles(x, y, count, color) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 4,
+          vy: (Math.random() - 0.5) * 4,
+          lifetime: 30 + Math.random() * 20,
+          color: color
+        });
+      }
+    }
+
+    function updateParticles() {
+      for (let i = 0; i < particles.length; i++) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.1; // slight gravity on particles
+        p.lifetime--;
+      }
+      particles = particles.filter(p => p.lifetime > 0);
+    }
+
+    function drawParticles() {
+      particles.forEach(p => {
+        // Create a radial gradient for each particle
+        let grad = ctx.createRadialGradient(
+          p.x - scrollX + 1.5, p.y + 1.5, 0,
+          p.x - scrollX + 1.5, p.y + 1.5, 3
+        );
+        grad.addColorStop(0, p.color);
+        grad.addColorStop(1, "transparent");
+        ctx.fillStyle = grad;
+        ctx.fillRect(p.x - scrollX, p.y, 3, 3);
+      });
+    }
+
+    /***************************************
+     * Platform Generation
+     ***************************************/
+    function generatePlatformsIfNeeded() {
+      // Find the rightmost edge among platforms.
+      let maxX = 0;
+      platforms.forEach(p => {
+        if (p.x + p.width > maxX) maxX = p.x + p.width;
+      });
+      // Create new platforms until we extend past the right edge + margin.
+      while (maxX < scrollX + canvas.width + 200) {
+        let gap = 50 + Math.random() * 80;
+        let newX = maxX + gap;
+        // Weighted chance: 70% ground, 30% floating.
+        let platformType = (Math.random() < 0.7) ? "ground" : "floating";
+        let newWidth = 150 + Math.random() * 100;
+        let newY, newHeight;
+        if (platformType === "ground") {
+          newY = 550;
+          newHeight = 50;
+        } else {
+          newY = 400 + Math.random() * 100;
+          newHeight = 20;
+        }
+        let newPlatform = { x: newX, y: newY, width: newWidth, height: newHeight, type: platformType };
+        platforms.push(newPlatform);
+        maxX = newPlatform.x + newPlatform.width;
+        // For ground platforms, spawn an enemy with a weighted chance.
+        if (platformType === "ground") {
+          let chance = Math.random();
+          if (chance < 0.3) {
+            // Standard ground enemy
+            enemies.push({
+              x: newPlatform.x + newPlatform.width / 2 - 16,
+              y: newPlatform.y - 32,
+              width: 32,
+              height: 32,
+              vx: (Math.random() < 0.5) ? -1.5 : 1.5,
+              type: "ground",
+              alive: true,
+              platform: newPlatform
+            });
+          } else if (chance < 0.5) {
+            // Charger enemy (faster and more aggressive)
+            enemies.push({
+              x: newPlatform.x + Math.random() * newPlatform.width,
+              y: newPlatform.y - 32,
+              width: 32,
+              height: 32,
+              vx: (Math.random() < 0.5) ? -3 : 3,
+              type: "charger",
+              alive: true
+            });
+          }
+        }
+      }
+    }
+
+    function removeOffScreenElements() {
+      platforms = platforms.filter(p => p.x + p.width > scrollX - 300);
+      enemies = enemies.filter(e => e.x + e.width > scrollX - 300);
+      projectiles = projectiles.filter(proj => proj.x > scrollX - 100 && proj.x < scrollX + canvas.width + 100);
+    }
+
+    /***************************************
+     * Upgrade Menu Functions
+     ***************************************/
+    // Randomly select three upgrade options.
+    function generateUpgradeOptions() {
+      let options = [];
+      let pool = availableUpgrades.slice();
+      while (pool.length > 0 && options.length < 3) {
+        let idx = Math.floor(Math.random() * pool.length);
+        options.push(pool.splice(idx, 1)[0]);
+      }
+      return options;
+    }
+
+    function handleUpgradeMenuInput() {
+      if (keys["1"] && currentUpgradeOptions[0]) {
+        currentUpgradeOptions[0].apply();
+        upgradeMenuActive = false;
+        keys["1"] = false;
+        nextUpgradeThreshold += 3;
+      } else if (keys["2"] && currentUpgradeOptions[1]) {
+        currentUpgradeOptions[1].apply();
+        upgradeMenuActive = false;
+        keys["2"] = false;
+        nextUpgradeThreshold += 3;
+      } else if (keys["3"] && currentUpgradeOptions[2]) {
+        currentUpgradeOptions[2].apply();
+        upgradeMenuActive = false;
+        keys["3"] = false;
+        nextUpgradeThreshold += 3;
+      }
+    }
+
+    function drawUpgradeMenu() {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "24px Arial";
+      ctx.fillText("Upgrade Time! Choose an upgrade:", canvas.width / 2 - 180, canvas.height / 2 - 80);
+      currentUpgradeOptions.forEach((upg, index) => {
+        let text = (index + 1) + ": " + upg.name + " – " + upg.description;
+        ctx.fillText(text, canvas.width / 2 - 220, canvas.height / 2 - 30 + index * 30);
+      });
+    }
+
+    /***************************************
+     * Projectile Functions (Shooting & Boss)
+     ***************************************/
+    function updateProjectiles() {
+      for (let i = 0; i < projectiles.length; i++) {
+        let proj = projectiles[i];
+        proj.x += proj.vx;
+        proj.y += (proj.vy || 0);
+        // Boss projectiles
+        if (proj.type === "bossProjectile") {
+          if (rectsCollide(proj, player)) {
+            if (keys["e"]) {
+              // Parry: damage boss
+              if (boss && boss.alive) {
+                boss.health--;
+                spawnParticles(boss.x + boss.width/2, boss.y + boss.height/2, 10, "#ADD8E6");
+                if (boss.health <= 0) {
+                  boss.alive = false;
+                  spawnParticles(boss.x + boss.width/2, boss.y + boss.height/2, 20, "#FFD700");
+                  boss = null;
+                  nextBossSpawnDistance = player.x + 10000;
+                }
+              }
+              proj.toRemove = true;
+            } else {
+              // Not parried: damage player.
+              player.lives--;
+              proj.toRemove = true;
+              if (player.lives <= 0) {
+                alert("Game Over!\nScore: " + score);
+                resetGame();
+              }
+            }
+          }
+        } else {
+          // For player projectiles, check collision with enemies.
+          enemies.forEach(enemy => {
+            if (enemy.alive && rectsCollide(proj, enemy)) {
+              enemy.alive = false;
+              spawnParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 15, "#FF4500");
+              score += 100;
+              killCount++;
+              proj.toRemove = true;
+              // Stomping an enemy restores your jumps.
+              player.jumps = 2;
+            }
+          });
+        }
+      }
+      projectiles = projectiles.filter(p => !p.toRemove);
+    }
+
+    function drawProjectiles() {
+      projectiles.forEach(proj => {
+        if (proj.type === "bossProjectile") {
+          ctx.fillStyle = "#FF00FF"; // Magenta for boss projectiles.
+        } else {
+          ctx.fillStyle = "#FFFF00"; // Yellow for player projectiles.
+        }
+        ctx.fillRect(proj.x - scrollX, proj.y, proj.width, proj.height);
+      });
+    }
+
+    /***************************************
+     * Flying Enemy Spawn
+     ***************************************/
+    function spawnFlyingEnemy() {
+      let yPos = 200 + Math.random() * 200;
+      enemies.push({
+        x: scrollX + canvas.width + 50,
+        y: yPos,
+        width: 32,
+        height: 32,
+        vx: (Math.random() < 0.5) ? -2 : 2,
+        type: "flying",
+        amplitude: 20 + Math.random() * 10,
+        phase: Math.random() * Math.PI * 2,
+        baseY: yPos,
+        alive: true
+      });
+    }
+
+    /***************************************
+     * Boss Functions
+     ***************************************/
+    function spawnBoss() {
+      boss = {
+        x: nextBossSpawnDistance + 300,
+        y: 150,
+        width: 80,
+        height: 80,
+        health: 3,
+        shootCooldown: 100,
+        alive: true
+      };
+    }
+
+    function updateBoss() {
+      if (!boss || !boss.alive) return;
+      boss.shootCooldown--;
+      if (boss.shootCooldown <= 0) {
+        // Boss fires a projectile aimed at the player.
+        let centerX = boss.x + boss.width / 2;
+        let centerY = boss.y + boss.height / 2;
+        let dx = player.x - centerX;
+        let dy = player.y - centerY;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        let speed = 5;
+        let vx = (dx / dist) * speed;
+        let vy = (dy / dist) * speed;
+        projectiles.push({
+          x: centerX,
+          y: centerY,
+          vx: vx,
+          vy: vy,
+          width: 10,
+          height: 10,
+          type: "bossProjectile"
+        });
+        boss.shootCooldown = 100;
+      }
+      // If the player stomps on the boss.
+      if (rectsCollide(player, boss)) {
+        if (player.vy > 0 && (player.y + player.height - 10) < boss.y) {
+          boss.health--;
+          player.vy = -7;
+          spawnParticles(boss.x + boss.width/2, boss.y + boss.height/2, 15, "#FF4500");
+          player.jumps = 2;
+          if (boss.health <= 0) {
+            boss.alive = false;
+            spawnParticles(boss.x + boss.width/2, boss.y + boss.height/2, 20, "#FFD700");
+            boss = null;
+            nextBossSpawnDistance = player.x + 10000;
+          }
+        } else {
+          player.lives--;
+          if (player.lives <= 0) {
+            alert("Game Over!\nScore: " + score);
+            resetGame();
+          } else {
+            player.x = scrollX + 50;
+            player.y = 0;
+            player.vx = 0;
+            player.vy = 0;
+          }
+        }
+      }
+    }
+
+    /***************************************
+     * Main Update Function
+     ***************************************/
+    function update() {
+      // If upgrade menu is active, pause game simulation.
+      if (upgradeMenuActive) {
+        handleUpgradeMenuInput();
+        updateParticles();
+        updateProjectiles();
+        return;
+      }
+
+      /********** Player Movement & Input **********/
+      if (keys["ArrowLeft"] || keys["a"]) {
+        player.vx = -player.moveSpeed;
+        player.facing = "left";
+      } else if (keys["ArrowRight"] || keys["d"]) {
+        player.vx = player.moveSpeed;
+        player.facing = "right";
+      } else {
+        player.vx *= friction;
+        if (Math.abs(player.vx) < 0.1) player.vx = 0;
+      }
+
+      // Jumping / Double Jump – Up/W/Space
+      if ((keys["ArrowUp"] || keys["w"] || keys[" "]) && (player.onGround || player.jumps > 0)) {
+        if (!player._jumpLock) {
+          player.vy = -player.jumpPower;
+          if (player.onGround) {
+            player.jumps = 1;
+          } else {
+            player.jumps--;
+          }
+          spawnParticles(player.x + player.width/2, player.y + player.height, 10, "#FFA500");
+          player._jumpLock = true;
+        }
+      }
+      if (!(keys["ArrowUp"] || keys["w"] || keys[" "])) {
+        player._jumpLock = false;
+      }
+
+      // Block ability (if unlocked)
+      if (player.blockEnabled) {
+        if (keys["b"] && !player.blockActive && player.blockCooldown <= 0) {
+          player.blockActive = true;
+          player.blockTimer = player.blockDuration;
+        }
+        if (player.blockActive) {
+          player.blockTimer--;
+          if (player.blockTimer <= 0) {
+            player.blockActive = false;
+            player.blockCooldown = player.blockDuration * 2;
+          }
+        } else if (player.blockCooldown > 0) {
+          player.blockCooldown--;
+        }
+      }
+
+      // Shooting (if unlocked)
+      if (player.shootEnabled) {
+        if (keys["k"] && player.shootCooldown <= 0) {
+          // Main projectile.
+          projectiles.push({
+            x: player.x + player.width/2,
+            y: player.y + player.height/2,
+            vx: (player.facing === "right" ? player.bulletSpeed : -player.bulletSpeed),
+            width: 8,
+            height: 4,
+            type: "playerProjectile"
+          });
+          // Extra projectiles if multiShot upgrade is active.
+          if (player.shootLevel > 1) {
+            // Slight upward angle.
+            projectiles.push({
+              x: player.x + player.width/2,
+              y: player.y + player.height/2,
+              vx: (player.facing === "right" ? player.bulletSpeed : -player.bulletSpeed),
+              vy: -2,
+              width: 8,
+              height: 4,
+              type: "playerProjectile"
+            });
+            if (player.shootLevel > 2) {
+              // Slight downward angle.
+              projectiles.push({
+                x: player.x + player.width/2,
+                y: player.y + player.height/2,
+                vx: (player.facing === "right" ? player.bulletSpeed : -player.bulletSpeed),
+                vy: 2,
+                width: 8,
+                height: 4,
+                type: "playerProjectile"
+              });
+            }
+          }
+          player.shootCooldown = player.shootCooldownMax;
+        }
+        if (player.shootCooldown > 0) {
+          player.shootCooldown--;
+        }
+      }
+
+      /********** Apply Gravity & Update Position **********/
+      player.vy += gravity;
+      player.x += player.vx;
+      player.y += player.vy;
+
+      /********** Platform Collision **********/
+      player.onGround = false;
+      platforms.forEach(platform => {
+        if (
+          player.vy >= 0 &&
+          player.x + player.width > platform.x &&
+          player.x < platform.x + platform.width &&
+          (player.y + player.height - player.vy) <= platform.y &&
+          (player.y + player.height + player.vy) >= platform.y
+        ) {
+          player.y = platform.y - player.height;
+          player.vy = 0;
+          player.onGround = true;
+          player.jumps = 2; // Reset jumps on landing.
+        }
+      });
+      if (player.onGround && !player._prevOnGround) {
+        spawnParticles(player.x + player.width/2, player.y + player.height, 10, "#FFD700");
+      }
+      player._prevOnGround = player.onGround;
+
+      /********** Camera & Level Updates **********/
+      scrollX = Math.max(player.x - canvas.width/2, 0);
+      generatePlatformsIfNeeded();
+      removeOffScreenElements();
+
+      /********** Enemy Updates **********/
+      enemies.forEach(enemy => {
+        if (!enemy.alive) return;
+        if (enemy.type === "ground") {
+          enemy.x += enemy.vx;
+          if (enemy.x < enemy.platform.x || enemy.x + enemy.width > enemy.platform.x + enemy.platform.width) {
+            enemy.vx *= -1;
+          }
+        } else if (enemy.type === "charger") {
+          enemy.x += enemy.vx;
+          // Charger enemies move faster.
+        } else if (enemy.type === "flying") {
+          enemy.x += enemy.vx;
+          enemy.y = enemy.baseY + Math.sin((enemy.x/50) + enemy.phase) * enemy.amplitude;
+        }
+        if (rectsCollide(player, enemy)) {
+          // If the player stomps the enemy, defeat it and restore jumps.
+          if (player.vy > 0 && (player.y + player.height - enemy.height/2) < enemy.y) {
+            enemy.alive = false;
+            player.vy = -7;
+            spawnParticles(enemy.x + enemy.width/2, enemy.y + enemy.height/2, 15, "#FF4500");
+            killCount++;
+            score += 100;
+            player.jumps = 2;
+          } else {
+            player.lives--;
+            if (player.lives <= 0) {
+              alert("Game Over!\nScore: " + score);
+              resetGame();
+            } else {
+              player.x = scrollX + 50;
+              player.y = 0;
+              player.vx = 0;
+              player.vy = 0;
+            }
+          }
+        }
+      });
+
+      /********** Boss Update **********/
+      if (boss === null && player.x > nextBossSpawnDistance) {
+        spawnBoss();
+      }
+      if (boss && boss.alive) {
+        updateBoss();
+      }
+
+      /********** Projectile Updates **********/
+      updateProjectiles();
+
+      /********** Flying Enemy Spawn **********/
+      flyingEnemySpawnTimer--;
+      if (flyingEnemySpawnTimer <= 0) {
+        spawnFlyingEnemy();
+        flyingEnemySpawnTimer = 200 + Math.floor(Math.random() * 200);
+      }
+
+      /********** Off-Screen Check for Player **********/
+      if (player.y > canvas.height) {
+        player.lives--;
+        if (player.lives <= 0) {
+          alert("Game Over!\nScore: " + score);
+          resetGame();
+        } else {
+          player.x = scrollX + 50;
+          player.y = 0;
+          player.vx = 0;
+          player.vy = 0;
+        }
+      }
+
+      /********** Upgrade Trigger **********/
+      if (killCount >= nextUpgradeThreshold && !upgradeMenuActive) {
+        upgradeMenuActive = true;
+        currentUpgradeOptions = generateUpgradeOptions();
+      }
+
+      /********** Score Update **********/
+      score = Math.floor(player.x) + killCount * 100;
+
+      updateParticles();
+    }
+
+    /***************************************
+     * Drawing Functions
+     ***************************************/
+    function draw() {
+      // Draw gradient background.
+      let bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bgGradient.addColorStop(0, "#87CEEB");
+      bgGradient.addColorStop(1, "#4682B4");
+      ctx.fillStyle = bgGradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw platforms.
+      platforms.forEach(platform => {
+        ctx.fillStyle = "#654321";
+        ctx.fillRect(platform.x - scrollX, platform.y, platform.width, platform.height);
+      });
+
+      // Draw player (cube-based design).
+      ctx.fillStyle = "#1E90FF";
+      ctx.fillRect(player.x - scrollX, player.y, player.width, player.height);
+      // Draw head (brown face).
+      const headSize = 20;
+      const headX = player.x - scrollX + (player.width - headSize) / 2;
+      const headY = player.y - headSize;
+      ctx.fillStyle = "#8B4513";
+      ctx.fillRect(headX, headY, headSize, headSize);
+      // Draw arms.
+      const armSize = 10;
+      const armY = player.y + player.height / 2 - armSize / 2;
+      ctx.fillStyle = "#00008B";
+      ctx.fillRect(player.x - scrollX - armSize, armY, armSize, armSize);
+      ctx.fillRect(player.x - scrollX + player.width, armY, armSize, armSize);
+      // Draw legs.
+      const legSize = 10;
+      ctx.fillStyle = "#00FFFF";
+      ctx.fillRect(player.x - scrollX + 4, player.y + player.height, legSize, legSize);
+      ctx.fillRect(player.x - scrollX + player.width - legSize - 4, player.y + player.height, legSize, legSize);
+
+      // Draw block shield if active.
+      if (player.blockActive) {
+        ctx.strokeStyle = "#ADD8E6";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(player.x - scrollX + player.width / 2, player.y + player.height / 2, player.width, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Draw enemies.
+      enemies.forEach(enemy => {
+        if (!enemy.alive) return;
+        if (enemy.type === "flying") {
+          ctx.fillStyle = "#800080";
+        } else if (enemy.type === "charger") {
+          ctx.fillStyle = "#FF8C00"; // Dark orange for chargers.
+        } else {
+          ctx.fillStyle = "#FF0000";
+        }
+        ctx.fillRect(enemy.x - scrollX, enemy.y, enemy.width, enemy.height);
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(enemy.x - scrollX + enemy.width / 4, enemy.y + enemy.height / 4, enemy.width / 8, enemy.height / 8);
+        ctx.fillRect(enemy.x - scrollX + enemy.width * 0.6, enemy.y + enemy.height / 4, enemy.width / 8, enemy.height / 8);
+      });
+
+      // Draw boss if present.
+      if (boss && boss.alive) {
+        ctx.fillStyle = "#00FF00";
+        ctx.fillRect(boss.x - scrollX, boss.y, boss.width, boss.height);
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(boss.x - scrollX + boss.width * 0.25, boss.y + boss.height * 0.3, 10, 10);
+        ctx.fillRect(boss.x - scrollX + boss.width * 0.65, boss.y + boss.height * 0.3, 10, 10);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "16px Arial";
+        ctx.fillText("HP: " + boss.health, boss.x - scrollX + boss.width / 4, boss.y - 10);
+      }
+
+      // Draw projectiles.
+      drawProjectiles();
+
+      // Draw particles.
+      drawParticles();
+
+      // Draw HUD.
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "20px Arial";
+      ctx.fillText("Lives: " + player.lives, 10, 30);
+      ctx.fillText("Kills: " + killCount, 10, 55);
+      ctx.fillText("Score: " + score, 10, 80);
+
+      // Draw upgrade menu if active.
+      if (upgradeMenuActive) {
+        drawUpgradeMenu();
+      }
+    }
+
+    /***************************************
+     * Main Game Loop
+     ***************************************/
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+  </script>
+</body>
+</html>

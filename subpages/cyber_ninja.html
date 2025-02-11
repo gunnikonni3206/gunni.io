@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Cyber Ninja: City Savior</title>
+  <style>
+    /* Basic styling for a dark, urban vibe */
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #111;
+    }
+    /* Fixed control buttons */
+    #pauseBtn, #backBtn {
+      position: fixed;
+      top: 10px;
+      z-index: 1000;
+      padding: 8px 12px;
+      background: #222;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #pauseBtn {
+      left: 10px;
+    }
+    #backBtn {
+      right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Control Buttons -->
+  <button id="pauseBtn">Pause</button>
+  <button id="backBtn">Back</button>
+  <!-- Game Canvas -->
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <script>
+    // ===================================================
+    // GLOBALS, ARRAYS & UPGRADE TRACKERS
+    // ===================================================
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Game states: "start", "playing", "upgrade", "gameOver"
+    let gameState = "start";
+    let paused = false;  // for pause/resume
+
+    // Core objects and arrays
+    let player, zombies, bullets, drones, bombs, bowlingBalls, particles, powerups, keys;
+    let lastTime, wave = 0, shootTimer = 0, score = 0;
+    let shootInterval = 0.5;    // seconds between auto–shots
+    let bulletDamage = 30;      // base bullet damage
+
+    // New globals for bomb & bowling ball mechanics:
+    let bombExplosionRadius = 50;
+    let bombExplosionDamage = 50;
+    let bombCooldown = 3;       // seconds between bomb drops
+    let bombTimer = 0;
+    let hasBowlingBarrage = false;  // unlocked via upgrade
+    let bowlingBallCooldown = 5; // seconds between bowling ball throws
+    let bowlingBallTimer = 0;
+    let bulletSizeMultiplier = 1;  // for bigger bullets
+
+    // Temporary invincibility (from powerups)
+    let invincibleTimer = 0;
+
+    // Upgrade trackers (effects stack)
+    let sawbladeLevel = 0;         // rotating blades damage near player
+    let explosiveRoundsLevel = 0;  // bullets cause splash damage
+    let multiShotLevel = 0;        // extra bullet spread
+    let slowFieldLevel = 0;        // slows enemies nearby
+    let shieldValue = 0;           // extra shield that absorbs damage
+    let overdriveLevel = 0;        // increases player speed
+    let criticalChance = 0;        // chance for bullets to double damage
+    let regenerationLevel = 0;     // heals player per second
+    let bulletSpeedMultiplier = 1; // bullets travel faster
+    let chainLightningLevel = 0;   // bullets chain to another enemy
+    let homingBulletsLevel = 0;    // bullets home in on zombies
+
+    // ===================================================
+    // UPGRADE POOL – A LARGE SET OF UNIQUE, STACKABLE UPGRADES
+    // ===================================================
+    // (Each upgrade’s effect function directly modifies globals.)
+    const upgradePool = [
+      { 
+        id: "fasterFire", 
+        name: "Faster Fire Rate", 
+        description: "Auto–shot interval –20%",
+        effect: () => { shootInterval = Math.max(0.2, shootInterval * 0.8); }
+      },
+      { 
+        id: "moreDamage", 
+        name: "More Powerful Bullets", 
+        description: "+10 bullet damage",
+        effect: () => { bulletDamage += 10; }
+      },
+      { 
+        id: "increasedHealth", 
+        name: "Increased Health", 
+        description: "+20 max HP (fully healed)",
+        effect: () => { player.maxHealth += 20; player.health = player.maxHealth; }
+      },
+      { 
+        id: "deployDrone", 
+        name: "Deploy a Drone", 
+        description: "Add an orbiting drone shooter",
+        effect: () => { drones.push(new Drone(Math.random() * Math.PI * 2, 40)); }
+      },
+      { 
+        id: "sawblades", 
+        name: "Activate Sawblades", 
+        description: "Rotating blades damage nearby foes",
+        effect: () => { sawbladeLevel += 1; }
+      },
+      { 
+        id: "explosiveRounds", 
+        name: "Explosive Rounds", 
+        description: "Bullets cause splash damage",
+        effect: () => { explosiveRoundsLevel += 1; }
+      },
+      { 
+        id: "multiShot", 
+        name: "Multi–Shot", 
+        description: "Fire extra bullets in a spread",
+        effect: () => { multiShotLevel += 1; }
+      },
+      { 
+        id: "slowField", 
+        name: "Slow Field", 
+        description: "Nearby enemies move slower",
+        effect: () => { slowFieldLevel += 1; }
+      },
+      { 
+        id: "shield", 
+        name: "Shield Barrier", 
+        description: "Gain +25 shield",
+        effect: () => { shieldValue += 25; }
+      },
+      { 
+        id: "overdrive", 
+        name: "Overdrive", 
+        description: "Increase movement speed by 50",
+        effect: () => { player.speed += 50; overdriveLevel += 1; }
+      },
+      { 
+        id: "criticalHits", 
+        name: "Critical Hits", 
+        description: "Increase crit chance by 5%",
+        effect: () => { criticalChance += 0.05; }
+      },
+      { 
+        id: "regeneration", 
+        name: "Regeneration", 
+        description: "Heal 2 HP per second",
+        effect: () => { regenerationLevel += 1; }
+      },
+      { 
+        id: "bulletSpeed", 
+        name: "Bullet Speed", 
+        description: "Bullets travel 20% faster",
+        effect: () => { bulletSpeedMultiplier += 0.2; }
+      },
+      { 
+        id: "chainLightning", 
+        name: "Chain Lightning", 
+        description: "Bullets chain to an extra enemy",
+        effect: () => { chainLightningLevel += 1; }
+      },
+      { 
+        id: "homingBullets", 
+        name: "Homing Bullets", 
+        description: "Bullets home in on zombies",
+        effect: () => { homingBulletsLevel += 1; }
+      },
+      { 
+        id: "biggerBullets", 
+        name: "Bigger Bullets", 
+        description: "Increase bullet size",
+        effect: () => { bulletSizeMultiplier += 0.5; }
+      },
+      { 
+        id: "bombDrop", 
+        name: "Bomb Enhancement", 
+        description: "Increase bomb explosion radius & damage",
+        effect: () => { bombExplosionRadius += 10; bombExplosionDamage += 10; }
+      },
+      { 
+        id: "bowlingBarrage", 
+        name: "Bowling Ball Barrage", 
+        description: "Unlock bouncing bowling balls (press V)",
+        effect: () => { hasBowlingBarrage = true; }
+      }
+    ];
+
+    // ===================================================
+    // HELPER FUNCTION: LERP FOR ANGLES (for homing bullets)
+    // ===================================================
+    function lerpAngle(a, b, t) {
+      let diff = b - a;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      return a + diff * t;
+    }
+
+    // ===================================================
+    // CLASSES
+    // ===================================================
+
+    // ---- Player Class ----
+    class Player {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 15;
+        this.baseSpeed = 200;
+        this.speed = this.baseSpeed;
+        this.maxHealth = 100;
+        this.health = this.maxHealth;
+      }
+      update(dt) {
+        let dx = 0, dy = 0;
+        if (keys["w"] || keys["ArrowUp"])    dy -= 1;
+        if (keys["s"] || keys["ArrowDown"])  dy += 1;
+        if (keys["a"] || keys["ArrowLeft"])  dx -= 1;
+        if (keys["d"] || keys["ArrowRight"]) dx += 1;
+        if (dx || dy) {
+          const len = Math.hypot(dx, dy);
+          dx /= len; dy /= len;
+        }
+        this.x += dx * this.speed * dt;
+        this.y += dy * this.speed * dt;
+        // Constrain within canvas
+        this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+        this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+      }
+      draw() {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // Health bar
+        let barWidth = this.radius * 2;
+        ctx.fillStyle = "#0f0";
+        ctx.fillRect(this.x - this.radius, this.y - this.radius - 10, (this.health/this.maxHealth)*barWidth, 5);
+        ctx.strokeStyle = "#fff";
+        ctx.strokeRect(this.x - this.radius, this.y - this.radius - 10, barWidth, 5);
+        // Draw shield if active
+        if (shieldValue > 0) {
+          ctx.strokeStyle = "blue";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius+5, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+        }
+      }
+    }
+
+    // ---- Zombie Classes ----
+    // Standard Zombie
+    class Zombie {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 15;
+        this.baseSpeed = 60;
+        this.health = 30;
+      }
+      update(dt) {
+        let dx = player.x - this.x;
+        let dy = player.y - this.y;
+        let dist = Math.hypot(dx, dy);
+        let effectiveSpeed = this.baseSpeed * (1 + 0.03 * wave);
+        if (slowFieldLevel > 0 && dist < 150) {
+          let slowMultiplier = Math.max(0.5, 1 - 0.1 * slowFieldLevel);
+          effectiveSpeed *= slowMultiplier;
+        }
+        if (dist > 0) {
+          this.x += (dx/dist)*effectiveSpeed*dt;
+          this.y += (dy/dist)*effectiveSpeed*dt;
+        }
+      }
+      draw() {
+        ctx.fillStyle = "#0f0";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+        // Health bar
+        let barWidth = this.radius*2;
+        ctx.fillStyle = "red";
+        ctx.fillRect(this.x - this.radius, this.y - this.radius - 8, (this.health/30)*barWidth, 4);
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(this.x - this.radius, this.y - this.radius - 8, barWidth, 4);
+      }
+    }
+    // Runner Zombie: faster, smaller, less health
+    class RunnerZombie {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 12;
+        this.baseSpeed = 100;
+        this.health = 20;
+      }
+      update(dt) {
+        let dx = player.x - this.x;
+        let dy = player.y - this.y;
+        let dist = Math.hypot(dx, dy);
+        let effectiveSpeed = this.baseSpeed * (1 + 0.03 * wave);
+        if (slowFieldLevel > 0 && dist < 150) {
+          let slowMultiplier = Math.max(0.5, 1 - 0.1 * slowFieldLevel);
+          effectiveSpeed *= slowMultiplier;
+        }
+        if (dist > 0) {
+          this.x += (dx/dist)*effectiveSpeed*dt;
+          this.y += (dy/dist)*effectiveSpeed*dt;
+        }
+      }
+      draw() {
+        ctx.fillStyle = "#ff0";  // yellow
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+        let barWidth = this.radius*2;
+        ctx.fillStyle = "red";
+        ctx.fillRect(this.x - this.radius, this.y - this.radius - 8, (this.health/20)*barWidth, 4);
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(this.x - this.radius, this.y - this.radius - 8, barWidth, 4);
+      }
+    }
+    // Tank Zombie: bigger, slower, more health
+    class TankZombie {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 25;
+        this.baseSpeed = 40;
+        this.health = 80;
+      }
+      update(dt) {
+        let dx = player.x - this.x;
+        let dy = player.y - this.y;
+        let dist = Math.hypot(dx, dy);
+        let effectiveSpeed = this.baseSpeed * (1 + 0.03 * wave);
+        if (slowFieldLevel > 0 && dist < 150) {
+          let slowMultiplier = Math.max(0.5, 1 - 0.1 * slowFieldLevel);
+          effectiveSpeed *= slowMultiplier;
+        }
+        if (dist > 0) {
+          this.x += (dx/dist)*effectiveSpeed*dt;
+          this.y += (dy/dist)*effectiveSpeed*dt;
+        }
+      }
+      draw() {
+        ctx.fillStyle = "#a52a2a";  // brown
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+        let barWidth = this.radius*2;
+        ctx.fillStyle = "red";
+        ctx.fillRect(this.x - this.radius, this.y - this.radius - 8, (this.health/80)*barWidth, 4);
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(this.x - this.radius, this.y - this.radius - 8, barWidth, 4);
+      }
+    }
+
+    // ---- Bullet Class ----
+    class Bullet {
+      constructor(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        this.radius = 5 * bulletSizeMultiplier;
+        this.speed = 500 * bulletSpeedMultiplier;
+        this.dx = Math.cos(angle) * this.speed;
+        this.dy = Math.sin(angle) * this.speed;
+        this.damage = bulletDamage;
+      }
+      update(dt) {
+        // Homing effect if enabled
+        if (homingBulletsLevel > 0 && zombies.length > 0) {
+          let nearest = null, minDist = Infinity;
+          for (let z of zombies) {
+            let d = distance(this.x, this.y, z.x, z.y);
+            if (d < minDist) { minDist = d; nearest = z; }
+          }
+          if (nearest) {
+            let desiredAngle = Math.atan2(nearest.y - this.y, nearest.x - this.x);
+            let currentAngle = Math.atan2(this.dy, this.dx);
+            let newAngle = lerpAngle(currentAngle, desiredAngle, 0.1 * homingBulletsLevel);
+            this.dx = Math.cos(newAngle) * this.speed;
+            this.dy = Math.sin(newAngle) * this.speed;
+          }
+        }
+        this.x += this.dx * dt;
+        this.y += this.dy * dt;
+      }
+      draw() {
+        ctx.fillStyle = "yellow";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ---- Drone Class ----
+    class Drone {
+      constructor(offsetAngle, distance) {
+        this.offsetAngle = offsetAngle;
+        this.distance = distance;
+        this.shootInterval = 1.0;
+        this.shootTimer = 0;
+      }
+      update(dt) {
+        this.shootTimer += dt;
+        this.offsetAngle += dt * 0.5;
+        if (this.shootTimer >= this.shootInterval && zombies.length > 0) {
+          let droneX = player.x + Math.cos(this.offsetAngle) * this.distance;
+          let droneY = player.y + Math.sin(this.offsetAngle) * this.distance;
+          let nearest = null, minDist = Infinity;
+          for (let z of zombies) {
+            let d = Math.hypot(z.x - droneX, z.y - droneY);
+            if (d < minDist) { minDist = d; nearest = z; }
+          }
+          if (nearest) {
+            let angle = Math.atan2(nearest.y - droneY, nearest.x - droneX);
+            bullets.push(new Bullet(droneX, droneY, angle));
+          }
+          this.shootTimer = 0;
+        }
+      }
+      draw() {
+        let droneX = player.x + Math.cos(this.offsetAngle) * this.distance;
+        let droneY = player.y + Math.sin(this.offsetAngle) * this.distance;
+        ctx.fillStyle = "#0ff";
+        ctx.beginPath();
+        ctx.arc(droneX, droneY, 10, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ---- Bomb Class ----
+    class Bomb {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 10;
+        this.timer = 2;  // seconds until explosion
+        this.exploded = false;
+      }
+      update(dt) {
+        this.timer -= dt;
+        if (this.timer <= 0 && !this.exploded) {
+          this.explode();
+          this.exploded = true;
+        }
+      }
+      explode() {
+        // Damage all zombies within explosion radius
+        for (let i = zombies.length - 1; i >= 0; i--) {
+          let d = distance(this.x, this.y, zombies[i].x, zombies[i].y);
+          if (d < bombExplosionRadius) {
+            zombies[i].health -= bombExplosionDamage;
+            if (zombies[i].health <= 0) { 
+              zombies.splice(i, 1);
+              score += 10;
+            }
+          }
+        }
+        // Spawn explosion particles
+        for (let i = 0; i < 30; i++) {
+          let angle = Math.random() * Math.PI * 2;
+          let speed = Math.random() * 100 + 50;
+          particles.push(new Particle(this.x, this.y, Math.cos(angle)*speed, Math.sin(angle)*speed, 1));
+        }
+      }
+      draw() {
+        // Draw bomb as a dark circle that flashes red near explosion
+        ctx.fillStyle = this.timer < 0.5 ? "#f00" : "#555";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ---- Bowling Ball Class ----
+    class BowlingBall {
+      constructor(x, y, dx, dy) {
+        this.x = x;
+        this.y = y;
+        this.radius = 15;
+        this.dx = dx;
+        this.dy = dy;
+        this.lifetime = 5;  // seconds before disappearing
+      }
+      update(dt) {
+        this.x += this.dx * dt;
+        this.y += this.dy * dt;
+        // Bounce off walls
+        if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
+          this.dx *= -1;
+          this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+        }
+        if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
+          this.dy *= -1;
+          this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+        }
+        // Decrease lifetime
+        this.lifetime -= dt;
+      }
+      draw() {
+        ctx.fillStyle = "#333";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+        // Draw a simple pattern to resemble a bowling ball
+        ctx.fillStyle = "#aaa";
+        ctx.beginPath();
+        ctx.arc(this.x - 5, this.y - 5, 3, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ---- Particle Class (for explosions) ----
+    class Particle {
+      constructor(x, y, dx, dy, life) {
+        this.x = x;
+        this.y = y;
+        this.dx = dx;
+        this.dy = dy;
+        this.life = life;   // seconds
+        this.maxLife = life;
+      }
+      update(dt) {
+        this.x += this.dx * dt;
+        this.y += this.dy * dt;
+        this.life -= dt;
+      }
+      draw() {
+        let alpha = Math.max(0, this.life/this.maxLife);
+        ctx.fillStyle = "rgba(255,165,0,"+alpha+")";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ---- Powerup Class ----
+    class Powerup {
+      constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.radius = 10;
+        this.type = type; // e.g., "damageBoost", "speedBoost", "regenBoost", "invincibility", "bombs"
+      }
+      update(dt) {
+        // Slowly drift downward
+        this.y += 20 * dt;
+      }
+      draw() {
+        // Color depends on type
+        let color = "#fff";
+        switch(this.type) {
+          case "damageBoost": color = "#f0f"; break;
+          case "speedBoost": color = "#0ff"; break;
+          case "regenBoost": color = "#0f0"; break;
+          case "invincibility": color = "#ff0"; break;
+          case "bombs": color = "#f80"; break;
+        }
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ===================================================
+    // UTILITY FUNCTIONS
+    // ===================================================
+    function distance(x1, y1, x2, y2) {
+      return Math.hypot(x2 - x1, y2 - y1);
+    }
+    // Calculate number of zombies per wave (fast increments)
+    function calculateEnemiesForWave(wave) {
+      let count;
+      if (wave <= 10) {
+        count = 10 + (wave - 1) * 10;  // 10, 20, ... 100
+      } else if (wave <= 20) {
+        count = (10 + 9*10) + (wave - 10) * 20;  // 120 ... 300
+      } else if (wave <= 30) {
+        count = (10 + 9*10) + (10*20) + (wave - 20) * 30;  // e.g., 330 ... 600
+      } else {
+        count = (10 + 9*10) + (10*20) + (10*30) + (wave - 30) * 40;
+      }
+      return count;
+    }
+    // Spawn a zombie at a random edge and randomly choose its type.
+    function spawnZombie() {
+      let x, y;
+      let edge = Math.floor(Math.random()*4);
+      if (edge === 0) { x = Math.random()*canvas.width; y = -20; }
+      else if (edge === 1) { x = canvas.width+20; y = Math.random()*canvas.height; }
+      else if (edge === 2) { x = Math.random()*canvas.width; y = canvas.height+20; }
+      else { x = -20; y = Math.random()*canvas.height; }
+      let r = Math.random();
+      if (r < 0.6) { zombies.push(new Zombie(x,y)); }
+      else if (r < 0.85) { zombies.push(new RunnerZombie(x,y)); }
+      else { zombies.push(new TankZombie(x,y)); }
+    }
+    // Generate 3 random, unique upgrade choices.
+    function generateUpgrades() {
+      let available = upgradePool.slice();
+      currentUpgrades = [];
+      for (let i = 0; i < 3; i++) {
+        let idx = Math.floor(Math.random()*available.length);
+        currentUpgrades.push(available[idx]);
+        available.splice(idx,1);
+      }
+    }
+    // Occasionally spawn a powerup when a zombie dies.
+    function maybeSpawnPowerup(x,y) {
+      if (Math.random() < 0.1) {  // 10% chance
+        let types = ["damageBoost","speedBoost","regenBoost","invincibility","bombs"];
+        let type = types[Math.floor(Math.random()*types.length)];
+        powerups.push(new Powerup(x,y,type));
+      }
+    }
+
+    // ===================================================
+    // INITIALIZATION & GAME LOOP
+    // ===================================================
+    function initGame() {
+      player = new Player(canvas.width/2, canvas.height/2);
+      zombies = [];
+      bullets = [];
+      drones = [];
+      bombs = [];
+      bowlingBalls = [];
+      particles = [];
+      powerups = [];
+      keys = {};
+      // Reset upgrade trackers
+      sawbladeLevel = 0; explosiveRoundsLevel = 0; multiShotLevel = 0;
+      slowFieldLevel = 0; shieldValue = 0; overdriveLevel = 0;
+      criticalChance = 0; regenerationLevel = 0; bulletSpeedMultiplier = 1;
+      chainLightningLevel = 0; homingBulletsLevel = 0;
+      bulletSizeMultiplier = 1;
+      bombExplosionRadius = 50; bombExplosionDamage = 50;
+      hasBowlingBarrage = false;
+      bombCooldown = 3; bombTimer = 0;
+      bowlingBallCooldown = 5; bowlingBallTimer = 0;
+      invincibleTimer = 0;
+      lastTime = performance.now();
+      wave = 0; score = 0; shootTimer = 0;
+      shootInterval = 0.5; bulletDamage = 30;
+      player.maxHealth = 100; player.health = player.maxHealth;
+      player.speed = player.baseSpeed;
+      gameState = "start";
+      paused = false;
+      document.getElementById("pauseBtn").textContent = "Pause";
+      gameLoop(lastTime);
+    }
+    function gameLoop(timestamp) {
+      let dt = (timestamp - lastTime)/1000;
+      lastTime = timestamp;
+      if (!paused) {
+        if (gameState === "playing") { update(dt); }
+      }
+      draw();
+      if (paused) {
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.font = "40px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText("Paused", canvas.width/2, canvas.height/2);
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    function update(dt) {
+      if (gameState === "playing") {
+        // Update bomb and bowling ball timers
+        bombTimer += dt;
+        bowlingBallTimer += dt;
+
+        // Update player and (if invincible) decrease timer
+        player.update(dt);
+        if (invincibleTimer > 0) { invincibleTimer -= dt; }
+
+        // Regeneration powerup
+        if (regenerationLevel > 0) {
+          player.health = Math.min(player.maxHealth, player.health + regenerationLevel*2*dt);
+        }
+
+        // Auto–shooting: fire toward nearest zombie
+        shootTimer += dt;
+        if (shootTimer >= shootInterval && zombies.length > 0) {
+          let nearest = null, minDist = Infinity;
+          for (let z of zombies) {
+            let d = distance(player.x, player.y, z.x, z.y);
+            if (d < minDist) { minDist = d; nearest = z; }
+          }
+          if (nearest) {
+            let baseAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+            let bulletCount = 1 + 2*multiShotLevel;
+            let spread = (Math.PI/12)*multiShotLevel;
+            for (let i = 0; i < bulletCount; i++) {
+              let offset = (bulletCount>1) ? spread*(i - (bulletCount-1)/2) : 0;
+              bullets.push(new Bullet(player.x, player.y, baseAngle+offset));
+            }
+          }
+          shootTimer = 0;
+        }
+
+        // Update bullets
+        for (let i = bullets.length-1; i>=0; i--) {
+          bullets[i].update(dt);
+          if (bullets[i].x<0 || bullets[i].x>canvas.width || bullets[i].y<0 || bullets[i].y>canvas.height) {
+            bullets.splice(i,1);
+          }
+        }
+
+        // Update zombies and check collisions with player and bullets.
+        for (let i = zombies.length-1; i>=0; i--) {
+          zombies[i].update(dt);
+          // Collision with player (if not invincible)
+          if (distance(zombies[i].x, zombies[i].y, player.x, player.y) < zombies[i].radius + player.radius) {
+            if (invincibleTimer <= 0) {
+              let dmg = 10;
+              if (shieldValue > 0) {
+                if (shieldValue >= dmg) { shieldValue -= dmg; dmg = 0; }
+                else { dmg -= shieldValue; shieldValue = 0; }
+              }
+              if (dmg > 0) { player.health -= dmg; }
+            }
+            zombies.splice(i,1);
+            if (player.health <= 0) { gameState = "gameOver"; }
+            continue;
+          }
+          // Check bullet collisions
+          for (let j = bullets.length-1; j>=0; j--) {
+            if (distance(zombies[i].x, zombies[i].y, bullets[j].x, bullets[j].y) < zombies[i].radius + bullets[j].radius) {
+              let dmg = bullets[j].damage;
+              if (Math.random() < criticalChance) { dmg *= 2; }
+              zombies[i].health -= dmg;
+              // Explosive rounds splash
+              if (explosiveRoundsLevel > 0) {
+                let expRadius = 30 + 5*explosiveRoundsLevel;
+                let expDmg = 15 + 5*explosiveRoundsLevel;
+                for (let k = 0; k < zombies.length; k++) {
+                  if (distance(bullets[j].x, bullets[j].y, zombies[k].x, zombies[k].y) < expRadius) {
+                    zombies[k].health -= expDmg;
+                  }
+                }
+              }
+              // Chain lightning: damage one extra nearby zombie
+              let bx = bullets[j].x, by = bullets[j].y;
+              bullets.splice(j,1);
+              if (chainLightningLevel > 0) {
+                let chainRange = 50 + 10*chainLightningLevel;
+                let chainDmg = 20 * chainLightningLevel;
+                for (let m = 0; m < zombies.length; m++) {
+                  if (distance(bx, by, zombies[m].x, zombies[m].y) < chainRange) {
+                    zombies[m].health -= chainDmg;
+                    break;
+                  }
+                }
+              }
+              if (zombies[i] && zombies[i].health <= 0) {
+                // Chance to drop a powerup
+                maybeSpawnPowerup(zombies[i].x, zombies[i].y);
+                zombies.splice(i,1);
+                score += 10;
+              }
+              break;
+            }
+          }
+        }
+
+        // Update bombs
+        for (let i = bombs.length-1; i>=0; i--) {
+          bombs[i].update(dt);
+          if (bombs[i].exploded) { bombs.splice(i,1); }
+        }
+        // If player presses "b" and bomb cooldown is ready, drop a bomb.
+        if (keys["b"] && bombTimer >= bombCooldown) {
+          bombs.push(new Bomb(player.x, player.y));
+          bombTimer = 0;
+          keys["b"] = false;
+        }
+        // Update bowling balls
+        for (let i = bowlingBalls.length-1; i>=0; i--) {
+          bowlingBalls[i].update(dt);
+          // Check collision with zombies
+          for (let j = zombies.length-1; j>=0; j--) {
+            if (distance(bowlingBalls[i].x, bowlingBalls[i].y, zombies[j].x, zombies[j].y) < bowlingBalls[i].radius + zombies[j].radius) {
+              zombies[j].health -= 40; // bowling ball damage
+              // Bounce: reverse velocity slightly
+              bowlingBalls[i].dx *= -0.8;
+              bowlingBalls[i].dy *= -0.8;
+              if (zombies[j].health <= 0) { zombies.splice(j,1); score += 10; }
+            }
+          }
+          if (bowlingBalls[i].lifetime <= 0) { bowlingBalls.splice(i,1); }
+        }
+        // If Bowling Ball Barrage is unlocked and player presses "v"
+        if (hasBowlingBarrage && keys["v"] && bowlingBallTimer >= bowlingBallCooldown) {
+          let angle = Math.random()*Math.PI*2;
+          bowlingBalls.push(new BowlingBall(player.x, player.y, Math.cos(angle)*200, Math.sin(angle)*200));
+          bowlingBallTimer = 0;
+          keys["v"] = false;
+        }
+        // Update particles
+        for (let i = particles.length-1; i>=0; i--) {
+          particles[i].update(dt);
+          if (particles[i].life <= 0) { particles.splice(i,1); }
+        }
+        // Update powerups
+        for (let i = powerups.length-1; i>=0; i--) {
+          powerups[i].update(dt);
+          // Check if player collects powerup
+          if (distance(powerups[i].x, powerups[i].y, player.x, player.y) < player.radius + powerups[i].radius) {
+            // Apply effect immediately:
+            switch(powerups[i].type) {
+              case "damageBoost": bulletDamage += 5; break;
+              case "speedBoost": player.speed += 50; break;
+              case "regenBoost": regenerationLevel += 1; break;
+              case "invincibility": invincibleTimer = 5; break;
+              case "bombs": bombExplosionRadius += 10; bombExplosionDamage += 10; break;
+            }
+            powerups.splice(i,1);
+          }
+        }
+        // Update drones
+        drones.forEach(drone => drone.update(dt));
+        // If sawblades upgrade is active, damage nearby zombies
+        if (sawbladeLevel > 0) {
+          sawbladeAngle += dt * Math.PI;
+          for (let i = zombies.length-1; i>=0; i--) {
+            if (distance(zombies[i].x, zombies[i].y, player.x, player.y) < player.radius + 30) {
+              zombies[i].health -= (40 + 20*(sawbladeLevel-1)) * dt;
+              if (zombies[i].health <= 0) { zombies.splice(i,1); score += 10; }
+            }
+          }
+        }
+        // Increase bomb and bowling ball timers
+        bombTimer += dt;
+        bowlingBallTimer += dt;
+        // When all zombies are cleared, move to upgrade selection.
+        if (zombies.length === 0) {
+          gameState = "upgrade";
+          generateUpgrades();
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if (gameState === "start") {
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.font = "30px Courier New";
+        ctx.fillText("DANGEROUS ZOMBIES ARE ATTACKING THE CITY!", canvas.width/2, canvas.height/2 - 80);
+        ctx.font = "20px Courier New";
+        ctx.fillText("Awakened by a dire dream, you must save the city!", canvas.width/2, canvas.height/2 - 40);
+        ctx.fillText("Use WASD/Arrow Keys to move.", canvas.width/2, canvas.height/2);
+        ctx.fillText("Press ENTER to begin your fight...", canvas.width/2, canvas.height/2 + 40);
+      }
+      else if (gameState === "playing") {
+        player.draw();
+        bullets.forEach(b => b.draw());
+        zombies.forEach(z => z.draw());
+        drones.forEach(d => d.draw());
+        bombs.forEach(bomb => bomb.draw());
+        bowlingBalls.forEach(bb => bb.draw());
+        particles.forEach(p => p.draw());
+        powerups.forEach(pu => pu.draw());
+        // Draw sawblades if active.
+        if (sawbladeLevel > 0) {
+          let count = 2 + (sawbladeLevel - 1);
+          let offset = player.radius + 20;
+          for (let i = 0; i < count; i++) {
+            let angle = sawbladeAngle + (2*Math.PI/count)*i;
+            let sx = player.x + Math.cos(angle)*offset;
+            let sy = player.y + Math.sin(angle)*offset;
+            ctx.fillStyle = "#f00";
+            ctx.beginPath();
+            ctx.arc(sx, sy, 8, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.beginPath();
+            ctx.moveTo(sx-8, sy);
+            ctx.lineTo(sx+8, sy);
+            ctx.stroke();
+          }
+        }
+        // HUD
+        ctx.fillStyle = "#fff";
+        ctx.font = "18px Courier New";
+        ctx.textAlign = "left";
+        ctx.fillText("Score: " + score, 10, 25);
+        ctx.fillText("Health: " + player.health + "/" + player.maxHealth, 10, 50);
+        ctx.fillText("Wave: " + wave, 10, 75);
+        // If invincible, show a small icon/text
+        if (invincibleTimer > 0) {
+          ctx.fillStyle = "#ff0";
+          ctx.fillText("INVINCIBLE", 10, 100);
+        }
+      }
+      else if (gameState === "upgrade") {
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.font = "28px Courier New";
+        ctx.fillText("Wave " + wave + " cleared!", canvas.width/2, canvas.height/2 - 160);
+        ctx.font = "22px Courier New";
+        ctx.fillText("Choose ONE upgrade:", canvas.width/2, canvas.height/2 - 120);
+        ctx.font = "20px Courier New";
+        for (let i = 0; i < currentUpgrades.length; i++) {
+          ctx.fillText((i+1) + ". " + currentUpgrades[i].name + " — " + currentUpgrades[i].description, canvas.width/2, canvas.height/2 - 60 + i*40);
+        }
+        ctx.fillText("Press 1, 2, or 3 to select your upgrade.", canvas.width/2, canvas.height/2 + 80);
+      }
+      else if (gameState === "gameOver") {
+        ctx.fillStyle = "rgba(0,0,0,0.85)";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.font = "40px Courier New";
+        ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 40);
+        ctx.font = "24px Courier New";
+        ctx.fillText("Final Score: " + score, canvas.width/2, canvas.height/2);
+        ctx.fillText("Press R to Restart", canvas.width/2, canvas.height/2 + 40);
+      }
+    }
+
+    // ===================================================
+    // EVENT LISTENERS
+    // ===================================================
+    window.addEventListener("keydown", function(e) {
+      keys[e.key] = true;
+      if (gameState === "start" && e.key === "Enter") {
+        gameState = "playing";
+        startWave();
+      }
+      else if (gameState === "upgrade") {
+        if (["1","2","3"].includes(e.key)) {
+          let index = parseInt(e.key)-1;
+          if (currentUpgrades[index]) { currentUpgrades[index].effect(); }
+          gameState = "playing";
+          startWave();
+        }
+      }
+      else if (gameState === "gameOver" && (e.key === "r" || e.key === "R")) {
+        initGame();
+      }
+    });
+    window.addEventListener("keyup", function(e) { keys[e.key] = false; });
+
+    // Pause and Back button functionality
+    const pauseBtn = document.getElementById("pauseBtn");
+    const backBtn = document.getElementById("backBtn");
+    pauseBtn.addEventListener("click", function() {
+      paused = !paused;
+      pauseBtn.textContent = paused ? "Resume" : "Pause";
+    });
+    backBtn.addEventListener("click", function() {
+      window.location.href = "games.html";
+    });
+
+    // ===================================================
+    // START THE GAME
+    // ===================================================
+    // Also, start a new wave: increment wave count and spawn zombies.
+    function startWave() {
+      wave++;
+      const enemyCount = calculateEnemiesForWave(wave);
+      for (let i = 0; i < enemyCount; i++) {
+        spawnZombie();
+      }
+    }
+    initGame();
+  </script>
+</body>
+</html>
